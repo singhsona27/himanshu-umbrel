@@ -1,0 +1,45 @@
+Karacraft Hosting V5
+
+V6 foundation additions:
+- Website-centric customer dashboard at /websites.php
+- Per-website management panel at /website.php
+- Tabs for Overview, Domains, Files, Databases, Backups, Security, Performance, Apps, Logs, and Support
+- One-click installers for WordPress, Moodle, OpenCart, Joomla, Drupal, and Grav
+- Customer Fresh Start action to wipe site files, app data, and reset the site database before reinstalling an app
+- Custom customer PHP image for app hosting with Sodium, Intl, ZIP, GD, SOAP, MySQL extensions, Apache rewrite, higher PHP limits, and unrestricted open_basedir for Moodle/OpenCart compatibility
+- Customer usability improvements: flash success/error messages for button actions, guided 3-step custom-domain setup, clearer Cloudflare DNS instructions, and ZIP upload/extract completion notices
+- Final usability pass: File Manager password reset in customer Files tab, custom domains shown as primary website URLs after verification, screenshot-style Cloudflare domain guide, open-website prompts after ZIP extract and app install, and hardened domain verify/repair routing support
+
+V5 builds on V3.1 with the bug fixes and platform upgrades discussed for the next professional release.
+
+Included:
+- Cloudflare wildcard + Traefik hostname routing
+- Fixed "Open Website" URL model through generated site/file domains
+- Customer dashboard self-service controls
+- ZIP upload and extract with permission repair
+- Storage and database usage shown against customer quota
+- FileBrowser customer accounts without admin privileges
+- FileBrowser used-disk percentage hidden and Karacraft branded
+- Secure password hashing for new/changed passwords
+- Customer and admin forgot-password/reset flows
+- Optional SMTP delivery for password reset links
+- Admin change own password
+- Create, enable/disable, manage, and reset admin users
+- Manual provisioning and gift hosting
+- Admin suspend, unsuspend, terminate, backup, renew, restart, and fix permissions
+- Custom domain records with DNS verification instructions
+- Customer dashboard custom domain add/remove workflow
+- Dedicated customer Domains page and sidebar menu item
+- Customer domain verify, repair, routing rebuild, status, and SSL/Cloudflare visibility
+- Encrypted customer Cloudflare API token storage with verify, sync DNS, and repair DNS actions
+- ZIP upload, selectable ZIP extraction, permission repair, and website restart
+- Customer backup creation and restore
+- Automatic www companion domain registration for website domains
+- Activity audit logs for user/admin/security actions
+- PLATFORM_ROOT-aware install and Docker Compose paths for Umbrel portability
+- Editable package builder / hosting plans
+- Customer and admin billing/invoice views
+- Customer support tickets and admin support queue
+- Customer migration requests and admin migration queue
+- Backup restore for site and database backup records
+- System health checks for containers, quota pressure, and domain configuration
