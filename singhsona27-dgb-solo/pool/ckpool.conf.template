@@ -1,0 +1,22 @@
+{
+  "btcd" : [
+    {
+      "url" : "dgb-digibyte:14022",
+      "auth" : "@@RPC_USER@@",
+      "pass" : "@@RPC_PASSWORD@@",
+      "notify" : false
+    }
+  ],
+  "btcaddress" : "@@DGB_MINING_ADDRESS@@",
+  "btcsig" : "@@POOL_SIGNATURE@@",
+  "donation" : 0.0,
+  "serverurl" : [
+    "0.0.0.0:@@STRATUM_INTERNAL_PORT@@"
+  ],
+  "logdir" : "/logs",
+  "mindiff" : @@MIN_DIFF@@,
+  "startdiff" : @@START_DIFF@@,
+  "maxdiff" : 0,
+  "nonce2length" : 4,
+  "update_interval" : 30
+}
