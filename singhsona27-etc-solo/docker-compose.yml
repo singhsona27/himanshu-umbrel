@@ -1,0 +1,60 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: dashboard
+      APP_PORT: 3088
+      PROXY_AUTH_ADD: "false"
+
+  dashboard:
+    image: nginx:1.27-alpine
+    restart: on-failure
+    volumes:
+      - ${APP_DATA_DIR}/dashboard:/usr/share/nginx/html:ro
+      - ${APP_DATA_DIR}/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+  settings-api:
+    image: python:3.12-alpine
+    restart: on-failure
+    working_dir: /app
+    command: ["python", "/app/settings_api.py"]
+    volumes:
+      - ${APP_DATA_DIR}/settings-api:/app:ro
+      - ${APP_DATA_DIR}/config:/config
+
+  core-geth:
+    image: etclabscore/core-geth:v1.12.21
+    restart: unless-stopped
+    stop_grace_period: 2m
+    volumes:
+      - ${APP_DATA_DIR}/geth:/root/.ethereum
+      - ${APP_DATA_DIR}/config:/config:ro
+    ports:
+      - "${ETC_P2P_PORT:-30303}:30303/tcp"
+      - "${ETC_P2P_PORT:-30303}:30303/udp"
+    entrypoint: ["/bin/sh", "/config/geth-entrypoint.sh"]
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --appendonly yes --maxmemory-policy noeviction
+    volumes:
+      - ${APP_DATA_DIR}/redis:/data
+
+  pool:
+    image: ghcr.io/singhsona27/etc-solo-core-pool:0.1.0
+    restart: unless-stopped
+    depends_on:
+      - core-geth
+      - redis
+    working_dir: /build
+    command: ["/bin/sh", "/pool/run.sh"]
+    volumes:
+      - ${APP_DATA_DIR}/config/config.template.json:/config/config.template.json:ro
+      - ${APP_DATA_DIR}/config/app.env:/config/app.env:ro
+      - ${APP_DATA_DIR}/pool/run.sh:/pool/run.sh:ro
+      - ${APP_DATA_DIR}/pool-build:/build
+    ports:
+      - "${ETC_STRATUM_PORT:-8008}:${ETC_STRATUM_PORT:-8008}/tcp"
+      - "${ETC_HTTP_MINING_PORT:-8888}:${ETC_HTTP_MINING_PORT:-8888}/tcp"
