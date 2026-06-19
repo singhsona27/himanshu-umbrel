@@ -24,7 +24,7 @@
   <text x="660" y="354" fill="#eef2f7" font-family="Inter, Arial, sans-serif" font-size="38" font-weight="700">Solo</text>
   <rect x="112" y="430" width="762" height="122" rx="12" fill="#0b0e13" stroke="#263244"/>
   <text x="140" y="482" fill="#9ca9ba" font-family="Inter, Arial, sans-serif" font-size="22">Stratum endpoint</text>
-  <text x="140" y="526" fill="#eef2f7" font-family="Consolas, monospace" font-size="30">stratum+tcp://umbrel.local:8008</text>
+  <text x="140" y="526" fill="#eef2f7" font-family="Consolas, monospace" font-size="30">stratum+tcp://umbrel.local:8018</text>
   <circle cx="1048" cy="352" r="112" fill="#10161f" stroke="#2f3a4c" stroke-width="8"/>
   <path d="M1048 224 978 349l70-32 70 32-70-125Z" fill="url(#green)"/>
   <path d="m978 370 70 41 70-41-70 94-70-94Z" fill="#9fe8c7"/>
