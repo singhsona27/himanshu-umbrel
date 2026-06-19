@@ -1,6 +1,12 @@
 const statusEl = document.querySelector("#status");
 const hashrateEl = document.querySelector("#hashrate");
 const workersEl = document.querySelector("#workers");
+const nodeSyncEl = document.querySelector("#node-sync");
+const nodeBlockEl = document.querySelector("#node-block");
+const highestBlockEl = document.querySelector("#highest-block");
+const peersEl = document.querySelector("#peers");
+const nodeStatusEl = document.querySelector("#node-status");
+const syncBarEl = document.querySelector("#sync-bar");
 const blocksEl = document.querySelector("#blocks");
 const luckEl = document.querySelector("#luck");
 const blockListEl = document.querySelector("#block-list");
@@ -25,11 +31,56 @@ async function getJson(path) {
   return res.json();
 }
 
+async function rpc(method) {
+  const res = await fetch("/api/geth", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params: [] }),
+  });
+  if (!res.ok) throw new Error(`${method} returned ${res.status}`);
+  const payload = await res.json();
+  if (payload.error) throw new Error(payload.error.message || method);
+  return payload.result;
+}
+
+function hexToNumber(value) {
+  if (!value) return 0;
+  return Number.parseInt(value, 16);
+}
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString();
+}
+
 function firstArray(value) {
   if (Array.isArray(value)) return value;
   if (value && Array.isArray(value.data)) return value.data;
   if (value && Array.isArray(value.result)) return value.result;
   return [];
+}
+
+async function refreshNode() {
+  const [syncing, blockHex, peersHex] = await Promise.all([
+    rpc("eth_syncing"),
+    rpc("eth_blockNumber"),
+    rpc("net_peerCount"),
+  ]);
+
+  const block = hexToNumber(blockHex);
+  const peers = hexToNumber(peersHex);
+  const isSyncing = syncing && syncing !== false;
+  const current = isSyncing ? hexToNumber(syncing.currentBlock) : block;
+  const highest = isSyncing ? hexToNumber(syncing.highestBlock) : block;
+  const pct = highest > 0 ? Math.min(100, (current / highest) * 100) : 0;
+
+  nodeSyncEl.textContent = isSyncing ? `${pct.toFixed(2)}%` : "100%";
+  nodeBlockEl.textContent = formatNumber(current);
+  highestBlockEl.textContent = formatNumber(highest);
+  peersEl.textContent = formatNumber(peers);
+  syncBarEl.style.width = `${isSyncing ? pct : 100}%`;
+  nodeStatusEl.textContent = isSyncing
+    ? `CoreGeth is syncing block ${formatNumber(current)} of ${formatNumber(highest)}. Wait for 100% before mining.`
+    : `CoreGeth is synced at block ${formatNumber(block)} with ${formatNumber(peers)} peers.`;
 }
 
 async function refresh() {
@@ -64,6 +115,18 @@ async function refresh() {
   catch (err) {
     statusEl.textContent = "API offline";
     statusEl.className = "pill bad";
+  }
+
+  try {
+    await refreshNode();
+  }
+  catch (err) {
+    nodeSyncEl.textContent = "--";
+    nodeBlockEl.textContent = "--";
+    highestBlockEl.textContent = "--";
+    peersEl.textContent = "--";
+    syncBarEl.style.width = "0%";
+    nodeStatusEl.textContent = "CoreGeth RPC is not reachable yet.";
   }
 }
 
