@@ -4,7 +4,15 @@ services:
     environment:
       APP_HOST: bsv-dashboard
       APP_PORT: 8080
+      PROXY_PORT: 3103
       PROXY_AUTH_ADD: "false"
+      PROXY_AUTH_WHITELIST: ""
+      PROXY_AUTH_BLACKLIST: ""
+      UMBREL_AUTH_SECRET: DEADBEEF
+      AUTH_SERVICE_PORT: 2000
+    volumes:
+      - ${APP_DATA_DIR}:/data
+      - ${APP_DATA_DIR}/umbrel-app.yml:/extra/umbrel-app.yml:ro
 
   bsv-node:
     image: zquestz/bitcoin-sv:latest
