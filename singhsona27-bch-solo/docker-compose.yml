@@ -17,6 +17,9 @@ services:
     volumes:
       - ${APP_DATA_DIR}:/data
       - ${APP_DATA_DIR}/umbrel-app.yml:/extra/umbrel-app.yml:ro
+    networks:
+      - default
+      - mining
 
   bch-node:
     image: zquestz/bitcoin-cash-node:latest
@@ -146,6 +149,7 @@ services:
         max-file: "3"
 
 networks:
+  default:
   mining:
     name: bchsolo-net
     driver: bridge

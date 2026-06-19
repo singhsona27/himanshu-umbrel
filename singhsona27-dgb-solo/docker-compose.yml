@@ -17,6 +17,9 @@ services:
     volumes:
       - ${APP_DATA_DIR}:/data
       - ${APP_DATA_DIR}/umbrel-app.yml:/extra/umbrel-app.yml:ro
+    networks:
+      - default
+      - mining
 
   dgb-digibyte:
     build:
@@ -165,6 +168,7 @@ services:
         max-file: "3"
 
 networks:
+  default:
   mining:
     name: dgbsha-net
     driver: bridge

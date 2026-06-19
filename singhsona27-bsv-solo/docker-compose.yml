@@ -17,6 +17,9 @@ services:
     volumes:
       - ${APP_DATA_DIR}:/data
       - ${APP_DATA_DIR}/umbrel-app.yml:/extra/umbrel-app.yml:ro
+    networks:
+      - default
+      - mining
 
   bsv-node:
     image: ${BSVN_IMAGE:-bitcoinsv/bitcoin-sv:latest}
@@ -149,6 +152,7 @@ services:
         max-file: "3"
 
 networks:
+  default:
   mining:
     name: bsvsolo-net
     driver: bridge
