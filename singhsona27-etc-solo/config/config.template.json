@@ -1,0 +1,102 @@
+{
+  "threads": ${ETC_POOL_THREADS},
+  "coin": "etc",
+  "name": "umbrel-etc-solo",
+  "network": "classic",
+  "proxy": {
+    "enabled": true,
+    "listen": "0.0.0.0:${ETC_HTTP_MINING_PORT}",
+    "limitHeadersSize": 1024,
+    "limitBodySize": 256,
+    "behindReverseProxy": false,
+    "blockRefreshInterval": "${ETC_BLOCK_REFRESH}",
+    "stateUpdateInterval": "${ETC_STATE_REFRESH}",
+    "difficulty": ${ETC_SHARE_DIFFICULTY},
+    "hashrateExpiration": "3h",
+    "healthCheck": true,
+    "debug": false,
+    "maxFails": 100,
+    "stratum": {
+      "enabled": true,
+      "listen": "0.0.0.0:${ETC_STRATUM_PORT}",
+      "timeout": "120s",
+      "maxConn": 128,
+      "tls": false,
+      "certFile": "",
+      "keyFile": ""
+    },
+    "policy": {
+      "workers": 8,
+      "resetInterval": "60m",
+      "refreshInterval": "1m",
+      "banning": {
+        "enabled": false,
+        "ipset": "blacklist",
+        "timeout": 1800,
+        "invalidPercent": 30,
+        "checkThreshold": 30,
+        "malformedLimit": 5
+      },
+      "limits": {
+        "enabled": false,
+        "limit": 30,
+        "grace": "5m",
+        "limitJump": 10
+      }
+    }
+  },
+  "api": {
+    "enabled": true,
+    "purgeOnly": false,
+    "purgeInterval": "10m",
+    "listen": "0.0.0.0:8080",
+    "statsCollectInterval": "5s",
+    "hashrateWindow": "30m",
+    "hashrateLargeWindow": "3h",
+    "luckWindow": [64, 128, 256],
+    "payments": 30,
+    "blocks": 50
+  },
+  "upstreamCheckInterval": "5s",
+  "upstream": [
+    {
+      "name": "core-geth",
+      "url": "http://core-geth:8545",
+      "timeout": "10s"
+    }
+  ],
+  "redis": {
+    "endpoint": "redis:6379",
+    "poolSize": 10,
+    "database": 0,
+    "password": ""
+  },
+  "unlocker": {
+    "enabled": false,
+    "poolFee": 0.0,
+    "poolFeeAddress": "",
+    "depth": 120,
+    "immatureDepth": 20,
+    "keepTxFees": true,
+    "interval": "10m",
+    "daemon": "http://core-geth:8545",
+    "timeout": "10s"
+  },
+  "payouts": {
+    "enabled": false,
+    "requirePeers": 1,
+    "interval": "120m",
+    "daemon": "http://core-geth:8545",
+    "timeout": "10s",
+    "address": "0x0",
+    "gas": "21000",
+    "gasPrice": "50000000000",
+    "autoGas": true,
+    "threshold": 500000000,
+    "bgsave": false
+  },
+  "newrelicEnabled": false,
+  "newrelicName": "Umbrel ETC Solo",
+  "newrelicKey": "",
+  "newrelicVerbose": false
+}
