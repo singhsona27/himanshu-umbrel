@@ -43,7 +43,7 @@ services:
       - ${APP_DATA_DIR}/redis:/data
 
   pool:
-    image: ghcr.io/singhsona27/etc-solo-core-pool:0.1.0
+    image: golang:1.22-bookworm
     restart: unless-stopped
     depends_on:
       - core-geth
