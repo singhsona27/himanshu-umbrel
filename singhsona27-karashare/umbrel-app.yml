@@ -1,0 +1,27 @@
+manifestVersion: 1
+id: singhsona27-karashare
+category: files
+name: Karashare
+version: "0.1.0"
+tagline: WEB-RTC basedP2P file sharing app for sending large files across.
+icon: https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-karashare/icon.svg
+description: >-
+  A self-contained PHP + WebRTC file sharing app. Umbrel launches the site
+  locally and exposes the homepage through the app dashboard for quick access
+  to install and share flows.
+releaseNotes: >-
+  Initial Umbrel community app release based on the Karashare self-installer
+  package.
+developer: singhsona27
+website: https://github.com/singhsona27
+dependencies: []
+repo: https://github.com/singhsona27/himanshu-umbrel
+support: https://github.com/singhsona27/himanshu-umbrel/issues
+port: 3104
+gallery:
+  - https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-karashare/1.svg
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: singhsona27
+submission: https://github.com/singhsona27/himanshu-umbrel
