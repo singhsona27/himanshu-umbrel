@@ -1,4 +1,4 @@
-name: ${COMPOSE_PROJECT_NAME:-dgbsha_solo}
+name: dgbsha_solo
 
 services:
   app_proxy:
@@ -12,7 +12,7 @@ services:
       context: ./docker/digibyte
       args:
         DIGIBYTE_VERSION: ${DIGIBYTE_VERSION:-8.26.2}
-    image: ${DEPLOY_ID:-dgbsha}-digibyte:${DIGIBYTE_VERSION:-8.26.2}
+    image: dgbsha-digibyte:${DIGIBYTE_VERSION:-8.26.2}
     restart: unless-stopped
     stop_grace_period: 2m
     environment:
@@ -50,7 +50,7 @@ services:
     ports:
       - "${DGB_P2P_PORT:-12024}:12024/tcp"
     volumes:
-      - ./data/digibyte:/data
+      - ${APP_DATA_DIR}/data/digibyte:/data
     networks:
       - mining
     healthcheck:
@@ -109,9 +109,9 @@ services:
     ports:
       - "${STRATUM_PORT:-3355}:3333/tcp"
     volumes:
-      - ./pool:/config:ro
-      - ./:/app:ro
-      - ./data/ckpool:/logs
+      - ${APP_DATA_DIR}/pool:/config:ro
+      - ${APP_DATA_DIR}/:/app:ro
+      - ${APP_DATA_DIR}/data/ckpool:/logs
     networks:
       - mining
     ulimits:
@@ -145,8 +145,8 @@ services:
     ports:
       - "${DASHBOARD_PORT:-8095}:8080/tcp"
     volumes:
-      - ./:/app
-      - ./data/ckpool:/logs:ro
+      - ${APP_DATA_DIR}/:/app
+      - ${APP_DATA_DIR}/data/ckpool:/logs:ro
     networks:
       - mining
     logging:
@@ -157,5 +157,5 @@ services:
 
 networks:
   mining:
-    name: ${DEPLOY_ID:-dgbsha}-net
+    name: dgbsha-net
     driver: bridge
