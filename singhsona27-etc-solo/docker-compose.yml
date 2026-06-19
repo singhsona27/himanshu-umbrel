@@ -31,8 +31,8 @@ services:
       - ${APP_DATA_DIR}/geth:/root/.ethereum
       - ${APP_DATA_DIR}/config:/config:ro
     ports:
-      - "${ETC_P2P_PORT:-30303}:30303/tcp"
-      - "${ETC_P2P_PORT:-30303}:30303/udp"
+      - "${ETC_P2P_PORT:-30313}:30303/tcp"
+      - "${ETC_P2P_PORT:-30313}:30303/udp"
     entrypoint: ["/bin/sh", "/config/geth-entrypoint.sh"]
 
   redis:
@@ -56,5 +56,5 @@ services:
       - ${APP_DATA_DIR}/pool/run.sh:/pool/run.sh:ro
       - ${APP_DATA_DIR}/pool-build:/build
     ports:
-      - "${ETC_STRATUM_PORT:-8008}:${ETC_STRATUM_PORT:-8008}/tcp"
-      - "${ETC_HTTP_MINING_PORT:-8888}:${ETC_HTTP_MINING_PORT:-8888}/tcp"
+      - "${ETC_STRATUM_PORT:-8018}:${ETC_STRATUM_PORT:-8018}/tcp"
+      - "${ETC_HTTP_MINING_PORT:-8898}:${ETC_HTTP_MINING_PORT:-8898}/tcp"
