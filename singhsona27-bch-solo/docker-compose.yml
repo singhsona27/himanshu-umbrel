@@ -25,30 +25,32 @@ services:
     environment:
       RPC_USER: ${RPC_USER:-umbrel}
       RPC_PASSWORD: ${RPC_PASSWORD:-changeme}
+    entrypoint: ["/bin/sh", "-ec"]
     command:
-      - bitcoind
-      - -datadir=/data
-      - -printtoconsole
-      - -server=1
-      - -listen=1
-      - -port=8333
-      - -rpcbind=0.0.0.0
-      - -rpcallowip=172.16.0.0/12
-      - -rpcallowip=192.168.0.0/16
-      - -rpcport=8332
-      - -rpcuser=${RPC_USER}
-      - -rpcpassword=${RPC_PASSWORD}
-      - -dbcache=${BCHN_DBCACHE_MB:-6144}
-      - -par=${BCHN_PAR:-3}
-      - -rpcthreads=${BCHN_RPC_THREADS:-8}
-      - -rpcworkqueue=${BCHN_RPC_WORKQUEUE:-128}
-      - -maxconnections=${BCHN_MAX_CONNECTIONS:-96}
-      - -maxmempool=${BCHN_MAX_MEMPOOL_MB:-1024}
-      - -mempoolexpiry=72
-      - -txindex=0
-      - -blocksonly=0
-      - -zmqpubhashblock=tcp://0.0.0.0:28332
-      - -zmqpubrawblock=tcp://0.0.0.0:28333
+      - |
+        exec bitcoind \
+          -datadir=/data \
+          -printtoconsole \
+          -server=1 \
+          -listen=1 \
+          -port=8333 \
+          -rpcbind=0.0.0.0 \
+          -rpcallowip=172.16.0.0/12 \
+          -rpcallowip=192.168.0.0/16 \
+          -rpcport=8332 \
+          -rpcuser=${RPC_USER} \
+          -rpcpassword=${RPC_PASSWORD} \
+          -dbcache=${BCHN_DBCACHE_MB:-6144} \
+          -par=${BCHN_PAR:-3} \
+          -rpcthreads=${BCHN_RPC_THREADS:-8} \
+          -rpcworkqueue=${BCHN_RPC_WORKQUEUE:-128} \
+          -maxconnections=${BCHN_MAX_CONNECTIONS:-96} \
+          -maxmempool=${BCHN_MAX_MEMPOOL_MB:-1024} \
+          -mempoolexpiry=72 \
+          -txindex=0 \
+          -blocksonly=0 \
+          -zmqpubhashblock=tcp://0.0.0.0:28332 \
+          -zmqpubrawblock=tcp://0.0.0.0:28333
     ports:
       - "${BCH_P2P_PORT:-8333}:8333/tcp"
     volumes:
