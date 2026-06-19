@@ -8,6 +8,10 @@ services:
       PROXY_AUTH_ADD: "false"
       PROXY_AUTH_WHITELIST: ""
       PROXY_AUTH_BLACKLIST: ""
+      LOG_LEVEL: info
+      JWT_SECRET: c42c8a9ac2f2d1d67860467eb18dd40d71de9487ae35ae8a632e14fe59f30c6f
+      MANAGER_IP: 10.21.21.4
+      MANAGER_PORT: 3006
       UMBREL_AUTH_SECRET: DEADBEEF
       AUTH_SERVICE_PORT: 2000
     volumes:
