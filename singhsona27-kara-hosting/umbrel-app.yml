@@ -20,7 +20,6 @@ support: https://github.com/singhsona27/himanshu-umbrel/issues
 port: 3105
 gallery:
   - https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-kara-hosting/1.svg
-path: "hosting_phase1"
 defaultUsername: ""
 defaultPassword: ""
 submitter: singhsona27
