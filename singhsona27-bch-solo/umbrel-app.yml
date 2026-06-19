@@ -1,0 +1,27 @@
+manifestVersion: 1
+id: singhsona27-bch-solo
+category: bitcoin
+name: BCH Solo Node +Mining Pool
+version: "0.1.0"
+tagline: Solo mine Pool for your BCH from your Umbrel
+icon: https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-bch-solo/icon.svg
+description: >-
+  A lightweight Bitcoin Cash solo-mining stack with BCHN, ckpool, an on-page
+  readiness checklist, and an editable settings form for wallet, node, and
+  pool configuration.
+releaseNotes: >-
+  Initial Umbrel community app release based on the BCH solo performance deploy
+  package with an embedded settings tab and app-page checklist.
+developer: singhsona27
+website: https://bitcoincash.org
+dependencies: []
+repo: https://github.com/singhsona27/himanshu-umbrel
+support: https://github.com/singhsona27/himanshu-umbrel/issues
+port: 3102
+gallery:
+  - https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-bch-solo/1.svg
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: singhsona27
+submission: https://github.com/singhsona27/himanshu-umbrel
