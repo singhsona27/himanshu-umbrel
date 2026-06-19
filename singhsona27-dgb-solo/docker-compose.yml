@@ -20,7 +20,7 @@ services:
 
   dgb-digibyte:
     build:
-      context: ./docker/digibyte
+      context: ${APP_DATA_DIR}/docker/digibyte
       args:
         DIGIBYTE_VERSION: ${DIGIBYTE_VERSION:-8.26.2}
     restart: unless-stopped
@@ -77,7 +77,7 @@ services:
 
   dgb-ckpool:
     build:
-      context: ./docker/ckpool
+      context: ${APP_DATA_DIR}/docker/ckpool
     restart: unless-stopped
     depends_on:
       dgb-digibyte:
