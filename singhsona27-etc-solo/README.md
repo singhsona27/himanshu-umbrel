@@ -19,7 +19,7 @@ This package runs a local Ethereum Classic solo-mining stack:
 Use your Umbrel LAN IP:
 
 ```text
-URL: stratum+tcp://UMBrel-LAN-IP:8008
+URL: stratum+tcp://UMBrel-LAN-IP:8018
 User: 0xYourEtcAddress.x16qe1
 Pass: x
 ```
@@ -36,4 +36,4 @@ network chatter; they do not increase the probability of finding an ETC block.
 Your chance of hitting a block comes from accepted hashrate, low latency to your
 own node, full sync, and good peer connectivity.
 
-Open/forward TCP+UDP `30303` if you want better CoreGeth peer reachability.
+Open/forward TCP+UDP `30313` if you want better CoreGeth peer reachability for this community-store app.
