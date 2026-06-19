@@ -26,6 +26,22 @@
         <strong id="workers">--</strong>
       </article>
       <article>
+        <span>Node Sync</span>
+        <strong id="node-sync">--</strong>
+      </article>
+      <article>
+        <span>Node Block</span>
+        <strong id="node-block">--</strong>
+      </article>
+      <article>
+        <span>Highest Block</span>
+        <strong id="highest-block">--</strong>
+      </article>
+      <article>
+        <span>Peers</span>
+        <strong id="peers">--</strong>
+      </article>
+      <article>
         <span>Blocks Found</span>
         <strong id="blocks">--</strong>
       </article>
@@ -36,9 +52,15 @@
     </section>
 
     <section class="panel">
+      <h2>Node Status</h2>
+      <p id="node-status">Checking CoreGeth sync status.</p>
+      <div class="progress"><span id="sync-bar"></span></div>
+    </section>
+
+    <section class="panel">
       <h2>Miner Endpoint</h2>
-      <p>Use your Umbrel LAN IP with Stratum port <code>8008</code>. Username should be your ETC address, with an optional worker suffix.</p>
-      <pre>stratum+tcp://UMBrel-LAN-IP:8008
+      <p>Use your Umbrel LAN IP with Stratum port <code>8018</code>. Username should be your ETC address, with an optional worker suffix.</p>
+      <pre>stratum+tcp://UMBrel-LAN-IP:8018
 username: 0xYourEtcAddress.x16qe1
 password: x</pre>
     </section>
