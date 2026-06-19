@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 CONFIG_PATH = "/config/app.env"
 
 DEFAULTS = {
-    "ETC_COINBASE": "",
+    "ETC_COINBASE": "0x824AE054553E5690319FfF39C2C969cde94E3924",
     "ETC_STRATUM_PORT": "8018",
     "ETC_HTTP_MINING_PORT": "8898",
     "ETC_P2P_PORT": "30313",
