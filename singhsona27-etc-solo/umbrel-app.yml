@@ -1,0 +1,28 @@
+manifestVersion: 1
+id: singhsona27-etc-solo
+category: bitcoin
+name: ETC Solo Node + Pool
+version: "0.1.0"
+tagline: Solo mine Ethereum Classic from your Umbrel
+icon: https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-etc-solo/icon.svg
+description: >-
+  A local Ethereum Classic solo-mining stack with CoreGeth, Redis, an
+  ETC-native Stratum pool, editable in-app settings, and a lightweight
+  dashboard. Point your ASIC miners at the Stratum endpoint after CoreGeth is
+  synced.
+releaseNotes: >-
+  Initial community app store release with CoreGeth v1.12.21 and ETC Labs
+  Core-Pool.
+developer: singhsona27
+website: https://ethereumclassic.org
+dependencies: []
+repo: https://github.com/singhsona27/himanshu-umbrel
+support: https://github.com/singhsona27/himanshu-umbrel/issues
+port: 3088
+gallery:
+  - https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-etc-solo/1.svg
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: singhsona27
+submission: https://github.com/singhsona27/himanshu-umbrel
