@@ -1,0 +1,27 @@
+manifestVersion: 1
+id: singhsona27-kara-hosting
+category: utilities
+name: Kara Hosting
+version: "0.1.0"
+tagline: Convert your umbrel into a powerful Hosting Space service provider.
+icon: https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-kara-hosting/icon.svg
+description: >-
+  A hosting control stack with portal, phpMyAdmin, Traefik, customer sites,
+  backups, and Cloudflare tunnel support. The app page surfaces the useful
+  local links and login details in one place.
+releaseNotes: >-
+  Initial Umbrel community app release based on the KaraCraft hosting enterprise
+  package.
+developer: singhsona27
+website: https://github.com/singhsona27
+dependencies: []
+repo: https://github.com/singhsona27/himanshu-umbrel
+support: https://github.com/singhsona27/himanshu-umbrel/issues
+port: 3105
+gallery:
+  - https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-kara-hosting/1.svg
+path: "hosting_phase1"
+defaultUsername: ""
+defaultPassword: ""
+submitter: singhsona27
+submission: https://github.com/singhsona27/himanshu-umbrel
