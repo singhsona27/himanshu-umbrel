@@ -9,5 +9,5 @@ services:
     image: php:8.3-apache
     restart: unless-stopped
     volumes:
-      - ./:/var/www/html
+      - ${APP_DATA_DIR}:/var/www/html
     command: ["/bin/sh", "-ec", "a2enmod rewrite headers >/dev/null 2>&1 || true; apache2-foreground"]
