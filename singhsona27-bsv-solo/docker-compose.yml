@@ -1,0 +1,137 @@
+name: ${COMPOSE_PROJECT_NAME:-bsvsolo_perf}
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: bsv-dashboard
+      APP_PORT: 8080
+      PROXY_AUTH_ADD: "false"
+
+  bsv-node:
+    image: ${BSVN_IMAGE:-zquestz/bitcoin-sv:latest}
+    restart: unless-stopped
+    stop_grace_period: 2m
+    environment:
+      RPC_USER: ${RPC_USER}
+      RPC_PASSWORD: ${RPC_PASSWORD}
+    command:
+      - -datadir=/data
+      - -printtoconsole
+      - -server=1
+      - -listen=1
+      - -port=8333
+      - -rpcbind=0.0.0.0
+      - -rpcallowip=172.16.0.0/12
+      - -rpcallowip=192.168.0.0/16
+      - -rpcport=8332
+      - -rpcuser=${RPC_USER}
+      - -rpcpassword=${RPC_PASSWORD}
+      - -dbcache=${BSVN_DBCACHE_MB:-6144}
+      - -par=${BSVN_PAR:-3}
+      - -rpcthreads=${BSVN_RPC_THREADS:-8}
+      - -rpcworkqueue=${BSVN_RPC_WORKQUEUE:-128}
+      - -maxconnections=${BSVN_MAX_CONNECTIONS:-96}
+      - -maxmempool=${BSVN_MAX_MEMPOOL_MB:-1024}
+      - -mempoolexpiry=72
+      - -txindex=0
+      - -blocksonly=0
+      - -zmqpubhashblock=tcp://0.0.0.0:28332
+      - -zmqpubrawblock=tcp://0.0.0.0:28333
+    ports:
+      - "${BSV_P2P_PORT:-8334}:8333/tcp"
+    volumes:
+      - ./data/bsvn:/data
+    networks:
+      - mining
+    healthcheck:
+      test: ["CMD-SHELL", "bitcoin-cli -datadir=/data -rpcconnect=127.0.0.1 -rpcuser=\"$${RPC_USER}\" -rpcpassword=\"$${RPC_PASSWORD}\" getblockchaininfo >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 2m
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  bsv-ckpool:
+    image: ${CKPOOL_IMAGE:-ghcr.io/willitmod/wim-solo-ckpool:0.8.3-rc1-590fb2a}
+    restart: unless-stopped
+    depends_on:
+      bsv-node:
+        condition: service_healthy
+    environment:
+      RPC_USER: ${RPC_USER}
+      RPC_PASSWORD: ${RPC_PASSWORD}
+      POOL_SIGNATURE: ${POOL_SIGNATURE:-BSV Solo}
+      STRATUM_INTERNAL_PORT: "3333"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        mkdir -p /run/ckpool /logs
+        sed \
+          -e "s|@@RPC_USER@@|$${RPC_USER}|g" \
+          -e "s|@@RPC_PASSWORD@@|$${RPC_PASSWORD}|g" \
+          -e "s|@@POOL_SIGNATURE@@|$${POOL_SIGNATURE}|g" \
+          -e "s|@@STRATUM_INTERNAL_PORT@@|$${STRATUM_INTERNAL_PORT}|g" \
+          /config/ckpool.conf.template > /run/ckpool/ckpool.conf
+        rm -f /tmp/ckpool/*.pid /run/ckpool/*.pid 2>/dev/null || true
+        if command -v ckpool >/dev/null 2>&1; then
+          exec ckpool -k -B -L -c /run/ckpool/ckpool.conf
+        elif [ -x /bin/ckpool ]; then
+          exec /bin/ckpool -k -B -L -c /run/ckpool/ckpool.conf
+        else
+          exec /usr/bin/ckpool -k -B -L -c /run/ckpool/ckpool.conf
+        fi
+    ports:
+      - "${STRATUM_PORT:-3336}:3333/tcp"
+    volumes:
+      - ./pool:/config:ro
+      - ./data/ckpool:/logs
+    networks:
+      - mining
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  bsv-dashboard:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    depends_on:
+      bsv-node:
+        condition: service_healthy
+    working_dir: /app
+    command: ["python", "/app/dashboard/dashboard.py"]
+    environment:
+      RPC_URL: http://bsv-node:8332/
+      RPC_USER: ${RPC_USER}
+      RPC_PASSWORD: ${RPC_PASSWORD}
+      STRATUM_PORT: ${STRATUM_PORT:-3336}
+      DASHBOARD_TITLE: ${DASHBOARD_TITLE:-BSV Solo Node}
+      EXPECTED_HASHRATE_TH: ${EXPECTED_HASHRATE_TH:-97}
+      DASHBOARD_USER: ${DASHBOARD_USER:-admin}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
+    ports:
+      - "${DASHBOARD_PORT:-8086}:8080/tcp"
+    volumes:
+      - ./:/app
+      - ./data/ckpool:/logs:ro
+    networks:
+      - mining
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+networks:
+  mining:
+    name: ${DEPLOY_ID:-bsvsolo}-net
+    driver: bridge
