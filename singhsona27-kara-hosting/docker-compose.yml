@@ -4,7 +4,15 @@ services:
     environment:
       APP_HOST: hosting-platform-portal
       APP_PORT: 80
+      PROXY_PORT: 3105
       PROXY_AUTH_ADD: "false"
+      PROXY_AUTH_WHITELIST: ""
+      PROXY_AUTH_BLACKLIST: ""
+      UMBREL_AUTH_SECRET: DEADBEEF
+      AUTH_SERVICE_PORT: 2000
+    volumes:
+      - ${APP_DATA_DIR}:/data
+      - ${APP_DATA_DIR}/umbrel-app.yml:/extra/umbrel-app.yml:ro
 
   traefik:
     image: traefik:v3.3
