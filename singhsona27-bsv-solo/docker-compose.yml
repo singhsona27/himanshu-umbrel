@@ -16,10 +16,10 @@ services:
       AUTH_SERVICE_PORT: 2000
     volumes:
       - ${APP_DATA_DIR}:/data
-      - ${APP_DATA_DIR}/umbrel-app.yml:/extra/umbrel-app.yml:ro
+      - ./umbrel-app.yml:/extra/umbrel-app.yml:ro
 
   bsv-node:
-    image: zquestz/bitcoin-sv:latest
+    image: ${BSVN_IMAGE:-bitcoinsv/bitcoin-sv:latest}
     restart: unless-stopped
     stop_grace_period: 2m
     environment:
@@ -46,6 +46,9 @@ services:
           -rpcworkqueue=${BSVN_RPC_WORKQUEUE:-128} \
           -maxconnections=${BSVN_MAX_CONNECTIONS:-96} \
           -maxmempool=${BSVN_MAX_MEMPOOL_MB:-1024} \
+          -excessiveblocksize=${BSVN_EXCESSIVE_BLOCKSIZE:-0} \
+          -maxstackmemoryusageconsensus=${BSVN_MAXSTACKMEMORYUSAGECONSENSUS:-0} \
+          -minminingtxfee=${BSVN_MIN_MINING_TX_FEE:-0} \
           -mempoolexpiry=72 \
           -txindex=0 \
           -blocksonly=0 \
