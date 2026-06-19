@@ -1,4 +1,4 @@
-name: ${COMPOSE_PROJECT_NAME:-bsvsolo_perf}
+name: bsvsolo_perf
 
 services:
   app_proxy:
@@ -8,7 +8,7 @@ services:
       PROXY_AUTH_ADD: "false"
 
   bsv-node:
-    image: ${BSVN_IMAGE:-zquestz/bitcoin-sv:latest}
+    image: zquestz/bitcoin-sv:latest
     restart: unless-stopped
     stop_grace_period: 2m
     environment:
@@ -40,7 +40,7 @@ services:
     ports:
       - "${BSV_P2P_PORT:-8334}:8333/tcp"
     volumes:
-      - ./data/bsvn:/data
+      - ${APP_DATA_DIR}/data/bsvn:/data
     networks:
       - mining
     healthcheck:
@@ -87,8 +87,8 @@ services:
     ports:
       - "${STRATUM_PORT:-3336}:3333/tcp"
     volumes:
-      - ./pool:/config:ro
-      - ./data/ckpool:/logs
+      - ${APP_DATA_DIR}/pool:/config:ro
+      - ${APP_DATA_DIR}/data/ckpool:/logs
     networks:
       - mining
     ulimits:
@@ -121,8 +121,8 @@ services:
     ports:
       - "${DASHBOARD_PORT:-8086}:8080/tcp"
     volumes:
-      - ./:/app
-      - ./data/ckpool:/logs:ro
+      - ${APP_DATA_DIR}/:/app
+      - ${APP_DATA_DIR}/data/ckpool:/logs:ro
     networks:
       - mining
     logging:
@@ -133,5 +133,5 @@ services:
 
 networks:
   mining:
-    name: ${DEPLOY_ID:-bsvsolo}-net
+    name: bsvsolo-net
     driver: bridge
