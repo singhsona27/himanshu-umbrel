@@ -23,9 +23,10 @@ services:
     restart: unless-stopped
     stop_grace_period: 2m
     environment:
-      RPC_USER: ${RPC_USER}
-      RPC_PASSWORD: ${RPC_PASSWORD}
+      RPC_USER: ${RPC_USER:-umbrel}
+      RPC_PASSWORD: ${RPC_PASSWORD:-changeme}
     command:
+      - bitcoind
       - -datadir=/data
       - -printtoconsole
       - -server=1
@@ -73,8 +74,8 @@ services:
       bsv-node:
         condition: service_healthy
     environment:
-      RPC_USER: ${RPC_USER}
-      RPC_PASSWORD: ${RPC_PASSWORD}
+      RPC_USER: ${RPC_USER:-umbrel}
+      RPC_PASSWORD: ${RPC_PASSWORD:-changeme}
       POOL_SIGNATURE: ${POOL_SIGNATURE:-BSV Solo}
       STRATUM_INTERNAL_PORT: "3333"
     entrypoint: ["/bin/sh", "-ec"]
@@ -122,13 +123,13 @@ services:
     command: ["python", "/app/dashboard/dashboard.py"]
     environment:
       RPC_URL: http://bsv-node:8332/
-      RPC_USER: ${RPC_USER}
-      RPC_PASSWORD: ${RPC_PASSWORD}
+      RPC_USER: ${RPC_USER:-umbrel}
+      RPC_PASSWORD: ${RPC_PASSWORD:-changeme}
       STRATUM_PORT: ${STRATUM_PORT:-3336}
       DASHBOARD_TITLE: ${DASHBOARD_TITLE:-BSV Solo Node}
       EXPECTED_HASHRATE_TH: ${EXPECTED_HASHRATE_TH:-97}
       DASHBOARD_USER: ${DASHBOARD_USER:-admin}
-      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-admin}
     ports:
       - "${DASHBOARD_PORT:-8086}:8080/tcp"
     volumes:
