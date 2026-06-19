@@ -16,7 +16,7 @@ services:
       AUTH_SERVICE_PORT: 2000
     volumes:
       - ${APP_DATA_DIR}:/data
-      - ./umbrel-app.yml:/extra/umbrel-app.yml:ro
+      - ${APP_DATA_DIR}/umbrel-app.yml:/extra/umbrel-app.yml:ro
 
   karashare-web:
     image: php:8.3-apache
