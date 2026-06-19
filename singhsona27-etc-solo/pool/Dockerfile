@@ -16,5 +16,5 @@ COPY --from=builder /out/core-pool /app/core-pool
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 8008 8888 8080
+EXPOSE 8018 8898 8080
 ENTRYPOINT ["/entrypoint.sh"]
