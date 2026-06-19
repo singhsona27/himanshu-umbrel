@@ -7,11 +7,11 @@ fi
 render_config() {
   sed \
     -e "s|\${ETC_POOL_THREADS}|${ETC_POOL_THREADS:-4}|g" \
-    -e "s|\${ETC_HTTP_MINING_PORT}|${ETC_HTTP_MINING_PORT:-8888}|g" \
+    -e "s|\${ETC_HTTP_MINING_PORT}|${ETC_HTTP_MINING_PORT:-8898}|g" \
     -e "s|\${ETC_BLOCK_REFRESH}|${ETC_BLOCK_REFRESH:-120ms}|g" \
     -e "s|\${ETC_STATE_REFRESH}|${ETC_STATE_REFRESH:-2s}|g" \
     -e "s|\${ETC_SHARE_DIFFICULTY}|${ETC_SHARE_DIFFICULTY:-8250000000}|g" \
-    -e "s|\${ETC_STRATUM_PORT}|${ETC_STRATUM_PORT:-8008}|g" \
+    -e "s|\${ETC_STRATUM_PORT}|${ETC_STRATUM_PORT:-8018}|g" \
     /config/config.template.json > /build/core-pool.json
 }
 
