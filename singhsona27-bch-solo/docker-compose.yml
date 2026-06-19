@@ -38,8 +38,8 @@ services:
           -rpcallowip=172.16.0.0/12 \
           -rpcallowip=192.168.0.0/16 \
           -rpcport=8332 \
-          -rpcuser=${RPC_USER} \
-          -rpcpassword=${RPC_PASSWORD} \
+          -rpcuser=${RPC_USER:-umbrel} \
+          -rpcpassword=${RPC_PASSWORD:-changeme} \
           -dbcache=${BCHN_DBCACHE_MB:-6144} \
           -par=${BCHN_PAR:-3} \
           -rpcthreads=${BCHN_RPC_THREADS:-8} \
