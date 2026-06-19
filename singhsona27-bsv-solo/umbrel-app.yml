@@ -1,0 +1,27 @@
+manifestVersion: 1
+id: singhsona27-bsv-solo
+category: bitcoin
+name: BSV (Bitcoin SV) Solo Node +Mining Pool
+version: "0.1.0"
+tagline: Solo mine Pool for your BSV from your Umbrel
+icon: https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-bsv-solo/icon.svg
+description: >-
+  A lightweight Bitcoin SV solo-mining stack with Bitcoin SV Node, ckpool, an
+  on-page readiness checklist, and an editable settings form for wallet, node,
+  and pool configuration.
+releaseNotes: >-
+  Initial Umbrel community app release based on the BSV solo performance deploy
+  package with an embedded settings tab and app-page checklist.
+developer: singhsona27
+website: https://bitcoinsv.com
+dependencies: []
+repo: https://github.com/singhsona27/himanshu-umbrel
+support: https://github.com/singhsona27/himanshu-umbrel/issues
+port: 3103
+gallery:
+  - https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-bsv-solo/1.svg
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: singhsona27
+submission: https://github.com/singhsona27/himanshu-umbrel
