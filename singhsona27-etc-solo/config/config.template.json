@@ -60,13 +60,13 @@
   "upstreamCheckInterval": "5s",
   "upstream": [
     {
-      "name": "core-geth",
-      "url": "http://core-geth:8545",
+      "name": "etc-solo-core-geth",
+      "url": "http://etc-solo-core-geth:8545",
       "timeout": "10s"
     }
   ],
   "redis": {
-    "endpoint": "redis:6379",
+    "endpoint": "etc-solo-redis:6379",
     "poolSize": 10,
     "database": 0,
     "password": ""
@@ -79,14 +79,14 @@
     "immatureDepth": 20,
     "keepTxFees": true,
     "interval": "10m",
-    "daemon": "http://core-geth:8545",
+    "daemon": "http://etc-solo-core-geth:8545",
     "timeout": "10s"
   },
   "payouts": {
     "enabled": false,
     "requirePeers": 1,
     "interval": "120m",
-    "daemon": "http://core-geth:8545",
+    "daemon": "http://etc-solo-core-geth:8545",
     "timeout": "10s",
     "address": "0x0",
     "gas": "21000",
