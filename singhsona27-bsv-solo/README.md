@@ -110,7 +110,7 @@ Dashboard:
 http://YOUR_PUBLIC_IP:8086
 ```
 
-The dashboard uses HTTP basic auth. Credentials are `DASHBOARD_USER` and `DASHBOARD_PASSWORD` in `.env`.
+Dashboard access is protected by Umbrel's app proxy; there is no extra dashboard password.
 
 ## Data and Backups
 

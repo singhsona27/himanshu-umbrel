@@ -16,8 +16,6 @@ STRATUM_PORT = os.environ.get("STRATUM_PORT", "3336")
 EXPECTED_HASHRATE_TH = float(os.environ.get("EXPECTED_HASHRATE_TH", "97") or 97)
 MINING_ADDRESS = os.environ.get("BSV_MINING_ADDRESS", "")
 LOG_DIR = "/logs"
-DASHBOARD_USER = os.environ.get("DASHBOARD_USER", "admin")
-DASHBOARD_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "")
 CACHE_SECONDS = float(os.environ.get("DASHBOARD_CACHE_SECONDS", "5") or 5)
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 CONFIG_PATH = os.path.join(ROOT_DIR, ".env")
@@ -27,12 +25,10 @@ DEFAULTS = {
     "STRATUM_PORT": "3336",
     "DASHBOARD_PORT": "8086",
     "BSV_P2P_PORT": "8334",
-    "BSVN_IMAGE": "zquestz/bitcoin-sv:latest",
+    "BSVN_IMAGE": "bitcoinsv/bitcoin-sv:latest",
     "CKPOOL_IMAGE": "ghcr.io/willitmod/wim-solo-ckpool:0.8.3-rc1-590fb2a",
     "RPC_USER": "bsvrpc",
     "RPC_PASSWORD": "",
-    "DASHBOARD_USER": "admin",
-    "DASHBOARD_PASSWORD": "",
     "BSVN_DBCACHE_MB": "6144",
     "BSVN_PAR": "3",
     "BSVN_RPC_THREADS": "8",
@@ -252,7 +248,7 @@ pre{white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto;ma
 </section>
 <section class="grid cols">
 <div class="card"><div class="section-title"><div class="label">Readiness Checklist</div><div class="muted small">node, pool, wallet, stratum</div></div><ul id="checklist" class="checklist"></ul></div>
-<div class="card"><div class="section-title"><div class="label">Settings</div><div class="muted small" id="settings-status">Saved in `.env`</div></div><form id="settings-form" class="settings"><label>BSV payout address<input name="BSV_MINING_ADDRESS" placeholder="bitcoin:..." autocomplete="off"></label><label>Stratum port<input name="STRATUM_PORT" inputmode="numeric"></label><label>Dashboard port<input name="DASHBOARD_PORT" inputmode="numeric"></label><label>BSV P2P port<input name="BSV_P2P_PORT" inputmode="numeric"></label><label>Expected hashrate TH/s<input name="EXPECTED_HASHRATE_TH" inputmode="decimal"></label><label>Node cache MB<input name="BSVN_DBCACHE_MB" inputmode="numeric"></label><label>Parallel threads<input name="BSVN_PAR" inputmode="numeric"></label><label>RPC threads<input name="BSVN_RPC_THREADS" inputmode="numeric"></label><label>RPC workqueue<input name="BSVN_RPC_WORKQUEUE" inputmode="numeric"></label><label>Max connections<input name="BSVN_MAX_CONNECTIONS" inputmode="numeric"></label><label>Max mempool MB<input name="BSVN_MAX_MEMPOOL_MB" inputmode="numeric"></label><label>Pool signature<input name="POOL_SIGNATURE" autocomplete="off"></label><label>Dashboard title<input name="DASHBOARD_TITLE" autocomplete="off"></label><label>RPC user<input name="RPC_USER" autocomplete="off"></label><label>RPC password<input name="RPC_PASSWORD" autocomplete="off"></label><label>Dashboard user<input name="DASHBOARD_USER" autocomplete="off"></label><label>Dashboard password<input name="DASHBOARD_PASSWORD" autocomplete="off"></label><button type="submit">Save Settings</button></form><p class="settings-status">Changes take effect after restarting the Umbrel app.</p></div>
+<div class="card"><div class="section-title"><div class="label">Settings</div><div class="muted small" id="settings-status">Saved in `.env`</div></div><form id="settings-form" class="settings"><label>BSV payout address<input name="BSV_MINING_ADDRESS" placeholder="bitcoin:..." autocomplete="off"></label><label>Stratum port<input name="STRATUM_PORT" inputmode="numeric"></label><label>Dashboard port<input name="DASHBOARD_PORT" inputmode="numeric"></label><label>BSV P2P port<input name="BSV_P2P_PORT" inputmode="numeric"></label><label>Expected hashrate TH/s<input name="EXPECTED_HASHRATE_TH" inputmode="decimal"></label><label>Node cache MB<input name="BSVN_DBCACHE_MB" inputmode="numeric"></label><label>Parallel threads<input name="BSVN_PAR" inputmode="numeric"></label><label>RPC threads<input name="BSVN_RPC_THREADS" inputmode="numeric"></label><label>RPC workqueue<input name="BSVN_RPC_WORKQUEUE" inputmode="numeric"></label><label>Max connections<input name="BSVN_MAX_CONNECTIONS" inputmode="numeric"></label><label>Max mempool MB<input name="BSVN_MAX_MEMPOOL_MB" inputmode="numeric"></label><label>Pool signature<input name="POOL_SIGNATURE" autocomplete="off"></label><label>Dashboard title<input name="DASHBOARD_TITLE" autocomplete="off"></label><label>RPC user<input name="RPC_USER" autocomplete="off"></label><label>RPC password<input name="RPC_PASSWORD" autocomplete="off"></label><button type="submit">Save Settings</button></form><p class="settings-status">Changes take effect after restarting the Umbrel app.</p></div>
 </section>
 <section class="grid cols">
 <div class="card"><div class="section-title"><div class="label">Pool Signals</div><div class="muted small">from ckpool logs</div></div><table id="pool"></table></div>
@@ -393,12 +389,6 @@ class Handler(BaseHTTPRequestHandler):
         return
 
     def do_GET(self):
-        if not self.authorized():
-            self.send_response(401)
-            self.send_header("WWW-Authenticate", 'Basic realm="BSV Solo Dashboard"')
-            self.end_headers()
-            self.wfile.write(b"Authentication required")
-            return
         if self.path.startswith("/api/config"):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -420,12 +410,6 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(HTML.encode())
 
     def do_POST(self):
-        if not self.authorized():
-            self.send_response(401)
-            self.send_header("WWW-Authenticate", 'Basic realm="BSV Solo Dashboard"')
-            self.end_headers()
-            self.wfile.write(b"Authentication required")
-            return
         if not self.path.startswith("/api/config"):
             self.send_response(404)
             self.send_header("Content-Type", "application/json")
@@ -454,19 +438,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(json.dumps({"config": config, "restartRequired": True}).encode())
-
-    def authorized(self):
-        if not DASHBOARD_PASSWORD:
-            return False
-        header = self.headers.get("Authorization", "")
-        if not header.startswith("Basic "):
-            return False
-        try:
-            raw = base64.b64decode(header.split(" ", 1)[1]).decode()
-        except Exception:
-            return False
-        return raw == f"{DASHBOARD_USER}:{DASHBOARD_PASSWORD}"
-
 
 if __name__ == "__main__":
     ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()

@@ -13,7 +13,7 @@ It runs:
 
 - DigiByte Core v8.26.2 built from the official `DigiByte-Core/digibyte` GitHub release.
 - ckpool built locally from source as a fast SHA256d solo stratum proxy.
-- Lightweight authenticated professional dashboard.
+- Lightweight professional dashboard protected by Umbrel's app proxy.
 - Persistent node and pool data under `data/`.
 
 ## Reality Check
@@ -76,7 +76,7 @@ The coinbase reward address is `DGB_MINING_ADDRESS` in `.env`.
 ## Ports
 
 - `3355/tcp`: stratum for your miners.
-- `8095/tcp`: dashboard with HTTP basic auth.
+- `8095/tcp`: dashboard, protected by Umbrel's app proxy.
 - `12024/tcp`: DigiByte P2P.
 - `14022/tcp`: DigiByte RPC, internal Docker network only. Do not expose publicly.
 
@@ -119,7 +119,7 @@ Dashboard:
 http://YOUR_PUBLIC_IP:8095
 ```
 
-Login is `DASHBOARD_USER` and `DASHBOARD_PASSWORD` from `.env`.
+Dashboard access is protected by Umbrel's app proxy; there is no extra dashboard password.
 
 ## Firewall
 
