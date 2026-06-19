@@ -25,6 +25,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - hosting_net
+      - default
 
   hosting-platform-db:
     image: mariadb:11
