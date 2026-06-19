@@ -23,7 +23,6 @@ services:
       context: ./docker/digibyte
       args:
         DIGIBYTE_VERSION: ${DIGIBYTE_VERSION:-8.26.2}
-    image: dgbsha-digibyte:${DIGIBYTE_VERSION:-8.26.2}
     restart: unless-stopped
     stop_grace_period: 2m
     environment:
@@ -79,7 +78,6 @@ services:
   dgb-ckpool:
     build:
       context: ./docker/ckpool
-    image: dgbsha-ckpool:local
     restart: unless-stopped
     depends_on:
       dgb-digibyte:
