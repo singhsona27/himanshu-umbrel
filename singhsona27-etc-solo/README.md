@@ -10,7 +10,7 @@ This package runs a local Ethereum Classic solo-mining stack:
 ## Required Setup
 
 1. Install the app from the `singhsona27` community store.
-2. Open the dashboard settings and set `ETC_COINBASE` to your ETC reward address.
+2. Open the dashboard settings and verify or edit `ETC_COINBASE`, the ETC reward address.
 3. Restart the app from Umbrel after saving settings.
 4. Wait for CoreGeth to sync before pointing miners at it.
 
