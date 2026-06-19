@@ -1,0 +1,9 @@
+<?php
+require 'config.php';
+require_user();
+require '_customer_nav.php';
+$uid=(int)current_user_id();
+$rows=$pdo->prepare('SELECT * FROM hosting_accounts WHERE user_id=? ORDER BY id DESC');
+$rows->execute([$uid]);
+?>
+<!doctype html><html><head><title>Websites</title><link rel="stylesheet" href="/style.css"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div class="dash"><?php customer_nav('websites'); ?><div class="main"><div class="account-head"><div><h1>Websites</h1><p class="muted">Manage each website like a Hostinger-style site dashboard.</p></div><a class="btn" href="/order.php">Add Website</a></div><?=render_flash()?><div class="grid"><?php foreach($rows as $r): $plan=plan_details($r['plan']); $sitePath=site_path_for($r); $storage=get_du_bytes($sitePath); $limit=($r['storage_limit_mb'] ?: $plan['storage_mb'])*1024*1024; $siteState=container_state($r['container_name']); $displayDomain=display_domain_for($pdo,$r,'website'); $displayUrl=display_url_for($pdo,$r,'website'); ?><div class="card"><div class="account-head"><h2><?=h($displayDomain ?: 'Website #'.$r['id'])?></h2><span class="badge <?=h($r['status'])?>"><?=h($r['status'])?></span></div><p class="muted"><?=h(ucfirst($r['plan']))?> hosting | Temporary: <?=h($r['site_domain'])?> | Container: <?=h($siteState)?></p><div class="usage-row"><label>Storage <?=h(fmt_bytes($storage))?> / <?=h(fmt_bytes($limit))?></label><div class="bar"><span style="width:<?=h(pct($storage,$limit))?>%"></span></div></div><p><a class="btn small" href="/website.php?id=<?=h($r['id'])?>">Manage</a> <a class="btn small" target="_blank" href="<?=h($displayUrl)?>">Open Site</a> <a class="btn small" target="_blank" href="<?=h(display_url_for($pdo,$r,'filemanager'))?>">Files</a></p></div><?php endforeach; ?></div></div></div></body></html>
