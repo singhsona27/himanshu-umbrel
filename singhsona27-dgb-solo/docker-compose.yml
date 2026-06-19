@@ -68,7 +68,7 @@ services:
   dgb-ckpool:
     build:
       context: ./docker/ckpool
-    image: ${DEPLOY_ID:-dgbsha}-ckpool:local
+    image: dgbsha-ckpool:local
     restart: unless-stopped
     depends_on:
       dgb-digibyte:
