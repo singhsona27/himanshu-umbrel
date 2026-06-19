@@ -18,7 +18,7 @@ website: https://ethereumclassic.org
 dependencies: []
 repo: https://github.com/singhsona27/himanshu-umbrel
 support: https://github.com/singhsona27/himanshu-umbrel/issues
-port: 3088
+port: 3098
 gallery:
   - https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-etc-solo/1.svg
 path: ""
