@@ -1,6 +1,10 @@
 services:
   app_proxy:
     image: getumbrel/app-proxy:1.7.0
+    restart: unless-stopped
+    depends_on:
+      dgb-dashboard:
+        condition: service_started
     environment:
       APP_HOST: dgb-dashboard
       APP_PORT: 8080
@@ -67,7 +71,11 @@ services:
     networks:
       - mining
     healthcheck:
-      test: ["CMD-SHELL", "digibyte-cli -datadir=/data -rpcconnect=127.0.0.1 -rpcuser=\"$${RPC_USER}\" -rpcpassword=\"$${RPC_PASSWORD}\" getblockchaininfo >/dev/null 2>&1"]
+      test:
+        [
+          "CMD-SHELL",
+          "digibyte-cli -datadir=/data -rpcconnect=127.0.0.1 -rpcuser=\"$${RPC_USER}\" -rpcpassword=\"$${RPC_PASSWORD}\" getblockchaininfo >/dev/null 2>&1"
+        ]
       interval: 30s
       timeout: 10s
       retries: 30
@@ -88,7 +96,7 @@ services:
     environment:
       RPC_USER: ${RPC_USER:-umbrel}
       RPC_PASSWORD: ${RPC_PASSWORD:-changeme}
-      DGB_MINING_ADDRESS: ${DGB_MINING_ADDRESS}
+      DGB_MINING_ADDRESS: ${DGB_MINING_ADDRESS:-CHANGE_ME_DGB_ADDRESS}
       POOL_SIGNATURE: ${POOL_SIGNATURE:-DGB-SHA256-SOLO}
       STRATUM_INTERNAL_PORT: "3333"
       START_DIFF: ${START_DIFF:-10000}
@@ -97,16 +105,20 @@ services:
     command:
       - |
         mkdir -p /run/ckpool /logs
+
         while :; do
           if [ -f /app/.env ]; then
             . /app/.env
           fi
+
           if [ -n "$${DGB_MINING_ADDRESS:-}" ] && [ "$${DGB_MINING_ADDRESS}" != "CHANGE_ME_DGB_ADDRESS" ]; then
             break
           fi
+
           echo "Waiting for DGB_MINING_ADDRESS in .env before starting ckpool..." >&2
           sleep 10
         done
+
         sed \
           -e "s|@@RPC_USER@@|$${RPC_USER}|g" \
           -e "s|@@RPC_PASSWORD@@|$${RPC_PASSWORD}|g" \
@@ -116,13 +128,15 @@ services:
           -e "s|@@START_DIFF@@|$${START_DIFF}|g" \
           -e "s|@@MIN_DIFF@@|$${MIN_DIFF}|g" \
           /config/ckpool.conf.template > /run/ckpool/ckpool.conf
+
         rm -f /tmp/ckpool/*.pid /run/ckpool/*.pid 2>/dev/null || true
+
         exec ckpool -k -B -L -c /run/ckpool/ckpool.conf
     ports:
       - "${STRATUM_PORT:-3355}:3333/tcp"
     volumes:
       - ${APP_DATA_DIR}/pool:/config:ro
-      - ${APP_DATA_DIR}/:/app:ro
+      - ${APP_DATA_DIR}:/app:ro
       - ${APP_DATA_DIR}/data/ckpool:/logs
     networks:
       - mining
@@ -151,11 +165,11 @@ services:
       STRATUM_PORT: ${STRATUM_PORT:-3355}
       DASHBOARD_TITLE: ${DASHBOARD_TITLE:-DGB SHA256 Solo Pool}
       EXPECTED_HASHRATE_TH: ${EXPECTED_HASHRATE_TH:-97}
-      DGB_MINING_ADDRESS: ${DGB_MINING_ADDRESS}
-    ports:
-      - "${DASHBOARD_PORT:-8095}:8080/tcp"
+      DGB_MINING_ADDRESS: ${DGB_MINING_ADDRESS:-CHANGE_ME_DGB_ADDRESS}
+    expose:
+      - "8080"
     volumes:
-      - ${APP_DATA_DIR}/:/app
+      - ${APP_DATA_DIR}:/app
       - ${APP_DATA_DIR}/data/ckpool:/logs:ro
     networks:
       - mining
@@ -166,7 +180,5 @@ services:
         max-file: "3"
 
 networks:
-  default:
   mining:
-    name: dgbsha-net
     driver: bridge
