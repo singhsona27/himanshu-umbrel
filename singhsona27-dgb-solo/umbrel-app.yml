@@ -2,7 +2,7 @@ manifestVersion: 1
 id: singhsona27-dgb-solo
 category: bitcoin
 name: DGB Solo Node + Mining Pool
-version: "0.1.1"
+version: "0.1.2"
 tagline: Solo mine DigiByte SHA256d from your Umbrel
 icon: https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-dgb-solo/icon.svg
 description: >-
