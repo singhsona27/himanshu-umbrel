@@ -1,17 +1,17 @@
 manifestVersion: 1
 id: singhsona27-dgb-solo
 category: bitcoin
-name: DGB Solo Node +Mining Pool
-version: "0.1.0"
-tagline: Solo mine Pool for your DGB-SHA256D from your Umbrel
+name: DGB Solo Node + Mining Pool
+version: "0.1.1"
+tagline: Solo mine DigiByte SHA256d from your Umbrel
 icon: https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-dgb-solo/icon.svg
 description: >-
-  A lightweight DigiByte SHA256d solo-mining stack with DigiByte Core,
-  ckpool, an on-page readiness checklist, and an editable settings form for
+  A lightweight DigiByte SHA256d solo-mining stack with DigiByte Core, ckpool,
+  an Umbrel-proxied dashboard, readiness checks, and editable settings for
   wallet, node, and pool configuration.
 releaseNotes: >-
-  Initial Umbrel community app release based on the DGB SHA256 solo performance
-  deploy package with an embedded settings tab and app-page checklist.
+  Fix Umbrel app packaging, app proxy networking, Compose network naming,
+  container naming, dashboard proxy behavior, and default environment handling.
 developer: singhsona27
 website: https://digibyte.org
 dependencies: []
