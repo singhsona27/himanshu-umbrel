@@ -8,7 +8,7 @@ services:
     environment:
       APP_HOST: dgb-dashboard
       APP_PORT: 8080
-      PROXY_PORT: 3101
+      PROXY_PORT: 32095
       PROXY_AUTH_ADD: "false"
       PROXY_AUTH_WHITELIST: ""
       PROXY_AUTH_BLACKLIST: ""
