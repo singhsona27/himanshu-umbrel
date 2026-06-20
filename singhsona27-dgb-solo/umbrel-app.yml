@@ -17,7 +17,7 @@ website: https://digibyte.org
 dependencies: []
 repo: https://github.com/singhsona27/himanshu-umbrel
 support: https://github.com/singhsona27/himanshu-umbrel/issues
-port: 3101
+port: 32095
 gallery:
   - https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-dgb-solo/1.svg
 path: ""
