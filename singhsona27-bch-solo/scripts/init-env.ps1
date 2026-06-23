@@ -18,6 +18,5 @@ $content = Get-Content -LiteralPath ".env" -Raw
 $content = [regex]::Replace($content, "CHANGE_ME_GENERATE_A_LONG_RANDOM_VALUE", $pass, 1)
 $content = [regex]::Replace($content, "CHANGE_ME_GENERATE_A_LONG_RANDOM_VALUE", $dashPass, 1)
 Set-Content -LiteralPath ".env" -Value $content -Encoding ASCII
-Write-Host "Created .env with a random RPC password."
-Write-Host "Dashboard access is protected by Umbrel's app proxy."
-Write-Host "Edit .env before starting if this is your second deployment on the same server."
+Write-Host "Created .env with random RPC and dashboard passwords."
+Write-Host "Edit .env and set BCH_MINING_ADDRESS to a legacy-format BCH address."

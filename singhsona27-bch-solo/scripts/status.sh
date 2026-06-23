@@ -4,8 +4,16 @@ set -eu
 cd "$(dirname "$0")/.."
 docker compose ps
 echo
-docker compose exec bch-node bitcoin-cli -datadir=/data \
+USER="$(grep '^RPC_USER=' .env | cut -d= -f2-)"
+PASS="$(grep '^RPC_PASSWORD=' .env | cut -d= -f2-)"
+docker compose exec -T bchn bitcoin-cli -datadir=/data \
   -rpcconnect=127.0.0.1 \
-  -rpcuser="$(grep '^RPC_USER=' .env | cut -d= -f2-)" \
-  -rpcpassword="$(grep '^RPC_PASSWORD=' .env | cut -d= -f2-)" \
+  -rpcuser="$USER" \
+  -rpcpassword="$PASS" \
   getblockchaininfo
+echo
+docker compose exec -T bchn bitcoin-cli -datadir=/data \
+  -rpcconnect=127.0.0.1 \
+  -rpcuser="$USER" \
+  -rpcpassword="$PASS" \
+  getzmqnotifications

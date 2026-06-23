@@ -1,6 +1,12 @@
 services:
   app_proxy:
     image: getumbrel/app-proxy:1.7.0
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
+    depends_on:
+      bch-dashboard:
+        condition: service_started
     environment:
       APP_HOST: bch-dashboard
       APP_PORT: 8080
@@ -14,93 +20,128 @@ services:
       MANAGER_PORT: 3006
       UMBREL_AUTH_SECRET: DEADBEEF
       AUTH_SERVICE_PORT: 2000
+    expose:
+      - "3102"
     volumes:
       - ${APP_DATA_DIR}:/data
       - ${APP_DATA_DIR}/umbrel-app.yml:/extra/umbrel-app.yml:ro
     networks:
       - default
       - mining
+    container_name: singhsona27-bch-solo_app_proxy_1
 
   bch-node:
-    image: zquestz/bitcoin-cash-node:latest
+    build:
+      context: ${APP_DATA_DIR}/docker/bchn
+      args:
+        BCHN_VERSION: ${BCHN_VERSION:-29.0.0}
     restart: unless-stopped
-    stop_grace_period: 2m
+    stop_grace_period: 3m
     environment:
-      RPC_USER: ${RPC_USER:-umbrel}
+      RPC_USER: ${RPC_USER:-bchrpc}
       RPC_PASSWORD: ${RPC_PASSWORD:-changeme}
-    entrypoint: ["/bin/sh", "-ec"]
     command:
-      - |
-        exec bitcoind \
-          -datadir=/data \
-          -printtoconsole \
-          -server=1 \
-          -listen=1 \
-          -port=8333 \
-          -rpcbind=0.0.0.0 \
-          -rpcallowip=172.16.0.0/12 \
-          -rpcallowip=192.168.0.0/16 \
-          -rpcport=8332 \
-          -rpcuser=${RPC_USER:-umbrel} \
-          -rpcpassword=${RPC_PASSWORD:-changeme} \
-          -dbcache=${BCHN_DBCACHE_MB:-6144} \
-          -par=${BCHN_PAR:-3} \
-          -rpcthreads=${BCHN_RPC_THREADS:-8} \
-          -rpcworkqueue=${BCHN_RPC_WORKQUEUE:-128} \
-          -maxconnections=${BCHN_MAX_CONNECTIONS:-96} \
-          -maxmempool=${BCHN_MAX_MEMPOOL_MB:-1024} \
-          -mempoolexpiry=72 \
-          -txindex=0 \
-          -blocksonly=0 \
-          -zmqpubhashblock=tcp://0.0.0.0:28332 \
-          -zmqpubrawblock=tcp://0.0.0.0:28333
+      - bitcoind
+      - -datadir=/data
+      - -printtoconsole
+      - -server=1
+      - -listen=1
+      - -discover=1
+      - -port=8333
+      - -rpcbind=0.0.0.0
+      - -rpcallowip=10.21.0.0/16
+      - -rpcallowip=172.16.0.0/12
+      - -rpcport=8332
+      - -rpcuser=${RPC_USER:-bchrpc}
+      - -rpcpassword=${RPC_PASSWORD:-changeme}
+      - -dbcache=${BCH_DBCACHE_MB:-4096}
+      - -par=${BCH_PAR:-4}
+      - -rpcthreads=${BCH_RPC_THREADS:-8}
+      - -rpcworkqueue=${BCH_RPC_WORKQUEUE:-128}
+      - -maxconnections=${BCH_MAX_CONNECTIONS:-128}
+      - -maxmempool=${BCH_MAX_MEMPOOL_MB:-512}
+      - -mempoolexpiry=72
+      - -txindex=0
+      - -disablewallet=1
+      - -listenonion=0
+      - -upnp=0
+      - -natpmp=0
+      - -dnsseed=1
+      - -persistmempool=1
+      - -shrinkdebugfile=1
+      - -zmqpubhashblock=tcp://0.0.0.0:28332
     ports:
       - "${BCH_P2P_PORT:-8333}:8333/tcp"
+    expose:
+      - "8332"
+      - "28332"
     volumes:
       - ${APP_DATA_DIR}/data/bchn:/data
     networks:
       - mining
     healthcheck:
-      test: ["CMD-SHELL", "bitcoin-cli -datadir=/data -rpcconnect=127.0.0.1 -rpcuser=\"$${RPC_USER}\" -rpcpassword=\"$${RPC_PASSWORD}\" getblockchaininfo >/dev/null 2>&1"]
-      interval: 30s
-      timeout: 10s
-      retries: 20
-      start_period: 2m
+      test:
+        - CMD-SHELL
+        - bitcoin-cli -datadir=/data -rpcconnect=127.0.0.1 -rpcuser="$${RPC_USER}" -rpcpassword="$${RPC_PASSWORD}" getblockchaininfo >/dev/null 2>&1
+      interval: 15s
+      timeout: 15s
+      retries: 120
+      start_period: 20m
     logging:
       driver: json-file
       options:
-        max-size: "50m"
-        max-file: "5"
+        max-size: 20m
+        max-file: "3"
+    container_name: singhsona27-bch-solo_bch-node_1
 
   bch-ckpool:
-    image: ${CKPOOL_IMAGE:-ghcr.io/willitmod/wim-solo-ckpool:0.8.3-rc1-590fb2a}
+    build:
+      context: ${APP_DATA_DIR}/docker/ckpool
     restart: unless-stopped
     depends_on:
       bch-node:
         condition: service_healthy
     environment:
-      RPC_USER: ${RPC_USER:-umbrel}
+      RPC_USER: ${RPC_USER:-bchrpc}
       RPC_PASSWORD: ${RPC_PASSWORD:-changeme}
-      POOL_SIGNATURE: ${POOL_SIGNATURE:-BCH Solo}
+      BCH_MINING_ADDRESS: ${BCH_MINING_ADDRESS:-}
+      POOL_SIGNATURE: ${POOL_SIGNATURE:-BCH-SOLO}
       STRATUM_INTERNAL_PORT: "3333"
-    entrypoint: ["/bin/sh", "-ec"]
+      START_DIFF: ${START_DIFF:-8192}
+      MIN_DIFF: ${MIN_DIFF:-1024}
+      BLOCKPOLL: ${BLOCKPOLL:-50}
+      UPDATE_INTERVAL: ${UPDATE_INTERVAL:-15}
+    entrypoint:
+      - /bin/sh
+      - -ec
     command:
       - |
         mkdir -p /run/ckpool /logs
+        test -n "$${BCH_MINING_ADDRESS}"
+        curl -fsS --user "$${RPC_USER}:$${RPC_PASSWORD}" \
+          --data-binary "{\"jsonrpc\":\"1.0\",\"id\":\"pool\",\"method\":\"validateaddress\",\"params\":[\"$${BCH_MINING_ADDRESS}\"]}" \
+          -H "content-type: text/plain;" http://bch-node:8332/ \
+          | grep -Eq '"isvalid"[[:space:]]*:[[:space:]]*true'
+        until curl -fsS --user "$${RPC_USER}:$${RPC_PASSWORD}" \
+          --data-binary '{"jsonrpc":"1.0","id":"pool","method":"getblockchaininfo","params":[]}' \
+          -H "content-type: text/plain;" http://bch-node:8332/ \
+          | grep -Eq '"initialblockdownload"[[:space:]]*:[[:space:]]*false'; do
+          echo "BCHN is syncing; ckpool will start when initial block download completes."
+          sleep 60
+        done
         sed \
           -e "s|@@RPC_USER@@|$${RPC_USER}|g" \
           -e "s|@@RPC_PASSWORD@@|$${RPC_PASSWORD}|g" \
+          -e "s|@@BCH_MINING_ADDRESS@@|$${BCH_MINING_ADDRESS}|g" \
           -e "s|@@POOL_SIGNATURE@@|$${POOL_SIGNATURE}|g" \
           -e "s|@@STRATUM_INTERNAL_PORT@@|$${STRATUM_INTERNAL_PORT}|g" \
+          -e "s|@@START_DIFF@@|$${START_DIFF}|g" \
+          -e "s|@@MIN_DIFF@@|$${MIN_DIFF}|g" \
+          -e "s|@@BLOCKPOLL@@|$${BLOCKPOLL}|g" \
+          -e "s|@@UPDATE_INTERVAL@@|$${UPDATE_INTERVAL}|g" \
           /config/ckpool.conf.template > /run/ckpool/ckpool.conf
         rm -f /tmp/ckpool/*.pid /run/ckpool/*.pid 2>/dev/null || true
-        if command -v ckpool >/dev/null 2>&1; then
-          exec ckpool -k -B -L -c /run/ckpool/ckpool.conf
-        elif [ -x /bin/ckpool ]; then
-          exec /bin/ckpool -k -B -L -c /run/ckpool/ckpool.conf
-        else
-          exec /usr/bin/ckpool -k -B -L -c /run/ckpool/ckpool.conf
-        fi
+        exec ckpool -k -B -q -c /run/ckpool/ckpool.conf
     ports:
       - "${STRATUM_PORT:-3335}:3333/tcp"
     volumes:
@@ -115,39 +156,52 @@ services:
     logging:
       driver: json-file
       options:
-        max-size: "50m"
-        max-file: "5"
+        max-size: 10m
+        max-file: "2"
+    container_name: singhsona27-bch-solo_bch-ckpool_1
 
   bch-dashboard:
     image: python:3.12-alpine
     restart: unless-stopped
+    mem_limit: 64m
+    cpus: 0.20
     depends_on:
       bch-node:
-        condition: service_healthy
+        condition: service_started
     working_dir: /app
-    command: ["python", "/app/dashboard/dashboard.py"]
+    command:
+      - python
+      - /app/dashboard.py
     environment:
       RPC_URL: http://bch-node:8332/
-      RPC_USER: ${RPC_USER:-umbrel}
+      RPC_USER: ${RPC_USER:-bchrpc}
       RPC_PASSWORD: ${RPC_PASSWORD:-changeme}
       STRATUM_PORT: ${STRATUM_PORT:-3335}
-      DASHBOARD_TITLE: ${DASHBOARD_TITLE:-BCH Solo Node}
-      EXPECTED_HASHRATE_TH: ${EXPECTED_HASHRATE_TH:-97}
-    ports:
-      - "${DASHBOARD_PORT:-8087}:8080/tcp"
+      DASHBOARD_TITLE: ${DASHBOARD_TITLE:-BCH Solo Node + Pool}
+      DASHBOARD_USER: ${DASHBOARD_USER:-admin}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-changeme}
+      BCH_MINING_ADDRESS: ${BCH_MINING_ADDRESS:-}
+      EXPECTED_HASHRATE_TH: ${EXPECTED_HASHRATE_TH:-102}
+      DASHBOARD_CACHE_SECONDS: ${DASHBOARD_CACHE_SECONDS:-30}
+      BLOCK_SCAN_DEPTH: ${BLOCK_SCAN_DEPTH:-10000}
+      BLOCK_SCAN_BATCH: ${BLOCK_SCAN_BATCH:-100}
+    expose:
+      - "8080"
     volumes:
-      - ${APP_DATA_DIR}/:/app
+      - ${APP_DATA_DIR}/dashboard:/app:ro
+      - ${APP_DATA_DIR}/data/dashboard:/cache
       - ${APP_DATA_DIR}/data/ckpool:/logs:ro
     networks:
       - mining
     logging:
       driver: json-file
       options:
-        max-size: "20m"
-        max-file: "3"
+        max-size: 2m
+        max-file: "2"
+    container_name: singhsona27-bch-solo_bch-dashboard_1
 
 networks:
   default:
   mining:
-    name: bchsolo-net
+    name: singhsona27-bch-solo-mining
     driver: bridge

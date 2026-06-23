@@ -1,387 +1,409 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib import request
 import base64
+import hmac
 import json
-import math
 import os
 import re
 import threading
 import time
 
-RPC_URL = os.environ.get("RPC_URL", "http://bch-node:8332/")
+RPC_URL = os.environ.get("RPC_URL", "http://bchn:8332/")
 RPC_USER = os.environ.get("RPC_USER", "")
 RPC_PASSWORD = os.environ.get("RPC_PASSWORD", "")
-TITLE = os.environ.get("DASHBOARD_TITLE", "BCH Solo Node")
-STRATUM_PORT = os.environ.get("STRATUM_PORT", "3335")
+DASHBOARD_USER = os.environ.get("DASHBOARD_USER", "admin")
+DASHBOARD_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "")
+BCH_ADDRESS = os.environ.get("BCH_MINING_ADDRESS", "")
+TITLE = os.environ.get("DASHBOARD_TITLE", "BCH Solo Pool")
+STRATUM_PORT = os.environ.get("STRATUM_PORT", "3333")
 EXPECTED_HASHRATE_TH = float(os.environ.get("EXPECTED_HASHRATE_TH", "97") or 97)
-MINING_ADDRESS = os.environ.get("BCH_MINING_ADDRESS", "")
+CACHE_SECONDS = max(30, int(os.environ.get("DASHBOARD_CACHE_SECONDS", "30") or 30))
+SCAN_DEPTH = max(0, int(os.environ.get("BLOCK_SCAN_DEPTH", "10000") or 10000))
+SCAN_BATCH = max(1, int(os.environ.get("BLOCK_SCAN_BATCH", "100") or 100))
+CACHE_FILE = "/cache/dashboard.json"
 LOG_DIR = "/logs"
-CACHE_SECONDS = float(os.environ.get("DASHBOARD_CACHE_SECONDS", "5") or 5)
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-CONFIG_PATH = os.path.join(ROOT_DIR, ".env")
+PRICE_SECONDS = 3600
 
-DEFAULTS = {
-    "BCH_MINING_ADDRESS": "",
-    "STRATUM_PORT": "3335",
-    "DASHBOARD_PORT": "8087",
-    "BCH_P2P_PORT": "8333",
-    "BCHN_IMAGE": "zquestz/bitcoin-cash-node:latest",
-    "CKPOOL_IMAGE": "ghcr.io/willitmod/wim-solo-ckpool:0.8.3-rc1-590fb2a",
-    "RPC_USER": "bchrpc",
-    "RPC_PASSWORD": "",
-    "BCHN_DBCACHE_MB": "6144",
-    "BCHN_PAR": "3",
-    "BCHN_RPC_THREADS": "8",
-    "BCHN_RPC_WORKQUEUE": "128",
-    "BCHN_MAX_CONNECTIONS": "96",
-    "BCHN_MAX_MEMPOOL_MB": "1024",
-    "EXPECTED_HASHRATE_TH": "97",
-    "POOL_SIGNATURE": "BCH Solo Q90 Nano",
-    "DASHBOARD_TITLE": "BCH Solo Node",
+STATE_LOCK = threading.Lock()
+STATE = {
+    "time": int(time.time()),
+    "title": TITLE,
+    "status": "starting",
+    "detail": "Waiting for Bitcoin Cash Node RPC",
+    "stratum_port": STRATUM_PORT,
+    "workers": [],
+    "pool": {},
+    "blocks": [],
 }
 
-_cache_lock = threading.Lock()
-_cache_at = 0.0
-_cache_data = None
 
-
-def read_config():
-    values = dict(DEFAULTS)
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, value = line.split("=", 1)
-                if key in values:
-                    values[key] = value
-    return values
-
-
-def write_config(payload):
-    values = dict(DEFAULTS)
-    for key, value in payload.items():
-        if key in values:
-            values[key] = str(value).strip()
-    with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
-        for key in DEFAULTS:
-            fh.write(f"{key}={values[key]}\n")
-    return values
-
-
-def rpc(method, params=None):
+def rpc(method, params=None, timeout=8):
     payload = json.dumps({
         "jsonrpc": "1.0",
         "id": "dashboard",
         "method": method,
         "params": params or [],
     }).encode()
-    auth = base64.b64encode(f"{RPC_USER}:{RPC_PASSWORD}".encode()).decode()
+    token = base64.b64encode(f"{RPC_USER}:{RPC_PASSWORD}".encode()).decode()
     req = request.Request(
         RPC_URL,
         data=payload,
-        headers={
-            "Authorization": f"Basic {auth}",
-            "Content-Type": "application/json",
-        },
+        headers={"Authorization": f"Basic {token}", "Content-Type": "application/json"},
     )
-    with request.urlopen(req, timeout=6) as res:
+    with request.urlopen(req, timeout=timeout) as res:
         body = json.loads(res.read().decode())
     if body.get("error"):
         raise RuntimeError(body["error"])
     return body.get("result")
 
 
-def block_seconds(difficulty, hashrate_th):
-    if not difficulty or hashrate_th <= 0:
+def load_cache():
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as fh:
+            value = json.load(fh)
+            if isinstance(value, dict):
+                return value
+    except Exception:
+        pass
+    return {"hits": [], "price": {"usd": None, "at": 0}}
+
+
+def save_cache(cache):
+    os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
+    temp = CACHE_FILE + ".tmp"
+    with open(temp, "w", encoding="utf-8") as fh:
+        json.dump(cache, fh, separators=(",", ":"))
+    os.replace(temp, CACHE_FILE)
+
+
+def price_usd(cache):
+    now = int(time.time())
+    price = cache.get("price", {})
+    if price.get("usd") and now - int(price.get("at", 0)) < PRICE_SECONDS:
+        return float(price["usd"])
+    try:
+        req = request.Request(
+            "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash&vs_currencies=usd",
+            headers={"User-Agent": "bch-solo-dashboard"},
+        )
+        body = json.loads(request.urlopen(req, timeout=5).read().decode())
+        usd = float(body["bitcoin-cash"]["usd"])
+        cache["price"] = {"usd": usd, "at": now}
+        return usd
+    except Exception:
+        return float(price.get("usd") or 0)
+
+
+def payout_script():
+    try:
+        result = rpc("validateaddress", [BCH_ADDRESS])
+        return str(result.get("scriptPubKey") or "").lower()
+    except Exception:
+        return ""
+
+
+def scan_block(height, script_hex):
+    block_hash = rpc("getblockhash", [height])
+    block = rpc("getblock", [block_hash, 1])
+    txids = block.get("tx", [])
+    if not txids:
         return None
-    return float(difficulty) * 4294967296.0 / (hashrate_th * 1_000_000_000_000.0)
-
-
-def probability(seconds, window_seconds):
-    if not seconds or seconds <= 0:
+    coinbase = rpc("getrawtransaction", [txids[0], True, block_hash])
+    reward = 0.0
+    for output in coinbase.get("vout", []):
+        output_script = str(output.get("scriptPubKey", {}).get("hex") or "").lower()
+        if script_hex and output_script == script_hex:
+            reward += float(output.get("value") or 0)
+    if reward <= 0:
         return None
-    return 1.0 - math.exp(-window_seconds / seconds)
+    return {
+        "height": height,
+        "hash": block_hash,
+        "time": int(block.get("time") or 0),
+        "confirmations": int(block.get("confirmations") or 0),
+        "reward": reward,
+        "txid": coinbase.get("txid"),
+    }
 
 
-def latest_log_file():
-    candidates = []
-    for root, _, files in os.walk(LOG_DIR):
-        for name in files:
-            lower = name.lower()
-            if lower.endswith(".log") or "log" in lower or "ckpool" in lower:
-                path = os.path.join(root, name)
-                try:
-                    candidates.append((os.path.getmtime(path), path))
-                except OSError:
-                    pass
-    return sorted(candidates)[-1][1] if candidates else None
+def scan_hits(cache, best):
+    script_hex = payout_script()
+    if not script_hex or best <= 0:
+        return cache.get("hits", [])
+
+    if cache.get("address") != BCH_ADDRESS:
+        cache.clear()
+        cache.update({"address": BCH_ADDRESS, "hits": [], "price": {"usd": None, "at": 0}})
+
+    hits = cache.get("hits", [])
+    known = {str(item.get("hash")) for item in hits}
+    tip_scanned = int(cache.get("tip_scanned", 0) or 0)
+    if not tip_scanned:
+        tip_scanned = max(0, best - 1)
+
+    last_tip = tip_scanned
+    for height in range(tip_scanned + 1, best + 1):
+        try:
+            hit = scan_block(height, script_hex)
+            if hit and hit["hash"] not in known:
+                hits.append(hit)
+                known.add(hit["hash"])
+            last_tip = height
+        except Exception:
+            break
+    cache["tip_scanned"] = last_tip
+
+    if SCAN_DEPTH and not cache.get("history_complete"):
+        history_start = max(0, best - SCAN_DEPTH)
+        cursor = int(cache.get("history_cursor", history_start) or history_start)
+        if cursor < history_start or cursor > best:
+            cursor = history_start
+        end = min(best, cursor + SCAN_BATCH - 1)
+        for height in range(cursor, end + 1):
+            try:
+                block_hash = rpc("getblockhash", [height])
+                if block_hash in known:
+                    continue
+                hit = scan_block(height, script_hex)
+                if hit:
+                    hits.append(hit)
+                    known.add(hit["hash"])
+            except Exception:
+                continue
+        cache["history_cursor"] = end + 1
+        cache["history_complete"] = end >= best
+
+    for hit in hits:
+        hit["confirmations"] = max(0, best - int(hit.get("height") or best) + 1)
+    cache["hits"] = sorted(hits, key=lambda item: int(item.get("height", 0)))
+    return cache["hits"]
 
 
-def tail_logs(max_lines=100):
-    path = latest_log_file()
-    if not path:
-        return []
+def parse_hashrate(value):
+    if isinstance(value, (int, float)):
+        return float(value) / 1e12
+    match = re.fullmatch(r"\s*([0-9.]+)\s*([kKmMgGtTpPeE]?)\s*", str(value or ""))
+    if not match:
+        return 0.0
+    scale = {"": 1, "k": 1e3, "m": 1e6, "g": 1e9, "t": 1e12, "p": 1e15, "e": 1e18}
+    return float(match.group(1)) * scale[match.group(2).lower()] / 1e12
+
+
+def worker_display_name(user_name, worker_name):
+    worker_name = str(worker_name or "").strip()
+    user_name = str(user_name or "").strip()
+    if worker_name and user_name and worker_name.startswith(user_name + "."):
+        return worker_name[len(user_name) + 1:] or worker_name
+    return worker_name or user_name
+
+
+def worker_stats():
+    workers = []
+    directory = os.path.join(LOG_DIR, "users")
+    try:
+        names = os.listdir(directory)
+    except OSError:
+        return workers
+    for name in names:
+        path = os.path.join(directory, name)
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                item = json.load(fh)
+        except Exception:
+            continue
+        entries = item.get("worker") or []
+        if not entries:
+            entries = [{"workername": name, **item}]
+        for worker in entries:
+            raw_name = worker.get("workername") or name
+            workers.append({
+                "name": worker_display_name(name, raw_name),
+                "full_name": raw_name,
+                "user": name,
+                "hashrate_1m_th": parse_hashrate(worker.get("hashrate1m")),
+                "hashrate_5m_th": parse_hashrate(worker.get("hashrate5m")),
+                "hashrate_1h_th": parse_hashrate(worker.get("hashrate1hr")),
+                "shares": float(worker.get("shares") or 0),
+                "bestshare": float(worker.get("bestshare") or 0),
+                "last_share": int(worker.get("lastshare") or 0),
+            })
+    return sorted(workers, key=lambda item: item["name"].lower())
+
+
+def tail_text(path, limit=65536):
     try:
         with open(path, "rb") as fh:
             fh.seek(0, os.SEEK_END)
             size = fh.tell()
-            fh.seek(max(0, size - 98304), os.SEEK_SET)
-            return fh.read().decode("utf-8", "replace").splitlines()[-max_lines:]
+            fh.seek(max(0, size - limit), os.SEEK_SET)
+            return fh.read().decode("utf-8", "replace")
     except OSError:
-        return []
+        return ""
 
 
-def log_stats(lines):
-    text = "\n".join(lines)
-    lower = text.lower()
-    users = set()
-    for line in lines:
-        for pattern in (r"user(?:name)?[=: ]+([A-Za-z0-9:._-]{8,})", r"worker[=: ]+([A-Za-z0-9:._-]{3,})"):
-            found = re.search(pattern, line, re.I)
-            if found:
-                users.add(found.group(1))
-    return {
-        "active_workers_hint": len(users) or None,
-        "accepted_hint": lower.count("accepted"),
-        "rejected_hint": lower.count("reject"),
-        "share_hint": lower.count("share"),
-        "block_hint": lower.count("block"),
-        "last_line": lines[-1] if lines else "",
+def pool_stats():
+    text = tail_text(os.path.join(LOG_DIR, "ckpool.log"))
+    result = {
+        "accepted": 0,
+        "rejected": 0,
+        "sps": 0,
+        "bestshare": 0,
+        "zmq_connected": "ZMQ connected to" in text,
     }
-
-
-def rpc_group():
-    methods = {
-        "blockchain": "getblockchaininfo",
-        "network": "getnetworkinfo",
-        "mining": "getmininginfo",
-        "mempool": "getmempoolinfo",
-        "uptime": "uptime",
-    }
-    data = {}
-    for key, method in methods.items():
+    matches = re.findall(r"Pool:(\{[^\r\n]+\})", text)
+    for raw in reversed(matches):
         try:
-            data[key] = rpc(method)
-        except Exception as exc:
-            data[key] = {"error": str(exc)}
-    return data
-
-
-def collect_uncached():
-    now = int(time.time())
-    logs = tail_logs()
-    data = {
-        "title": TITLE,
-        "time": now,
-        "stratum_port": STRATUM_PORT,
-        "expected_hashrate_th": EXPECTED_HASHRATE_TH,
-        "mining_address": MINING_ADDRESS,
-        "logs": logs,
-        "pool": log_stats(logs),
-    }
-    data.update(rpc_group())
-    mining = data.get("mining") if isinstance(data.get("mining"), dict) else {}
-    blockchain = data.get("blockchain") if isinstance(data.get("blockchain"), dict) else {}
-    difficulty = mining.get("difficulty") or blockchain.get("difficulty")
-    seconds = block_seconds(difficulty, EXPECTED_HASHRATE_TH)
-    data["solo"] = {
-        "expected_seconds": seconds,
-        "expected_days": seconds / 86400.0 if seconds else None,
-        "probability_24h": probability(seconds, 86400),
-        "probability_7d": probability(seconds, 604800),
-        "probability_30d": probability(seconds, 2592000),
-    }
-    return data
+            value = json.loads(raw)
+        except Exception:
+            continue
+        if "accepted" in value:
+            result.update({
+                "accepted": float(value.get("accepted") or 0),
+                "rejected": float(value.get("rejected") or 0),
+                "sps": float(value.get("SPS1m") or 0),
+                "bestshare": float(value.get("bestshare") or 0),
+            })
+            break
+    result["logs"] = [line for line in text.splitlines()[-8:] if line.strip()]
+    return result
 
 
 def collect():
-    global _cache_at, _cache_data
-    now = time.time()
-    with _cache_lock:
-        if _cache_data is not None and now - _cache_at < CACHE_SECONDS:
-            return _cache_data
-        _cache_data = collect_uncached()
-        _cache_at = now
-        return _cache_data
+    now = int(time.time())
+    cache = load_cache()
+    workers = worker_stats()
+    pool = pool_stats()
+    data = {
+        "time": now,
+        "title": TITLE,
+        "status": "starting",
+        "detail": "Waiting for Bitcoin Cash Node RPC",
+        "stratum_port": STRATUM_PORT,
+        "address": BCH_ADDRESS,
+        "workers": workers,
+        "pool": pool,
+        "blocks": cache.get("hits", []),
+    }
+    try:
+        chain = rpc("getblockchaininfo")
+        network = rpc("getnetworkinfo")
+        mining = rpc("getmininginfo")
+        zmq = rpc("getzmqnotifications")
+        best = int(chain.get("blocks") or 0)
+        ready = not chain.get("initialblockdownload") and int(chain.get("headers") or 0) <= best + 1
+        if ready:
+            hits = scan_hits(cache, best)
+        else:
+            if cache.get("address") != BCH_ADDRESS:
+                cache.clear()
+                cache.update({"address": BCH_ADDRESS, "hits": [], "price": {"usd": None, "at": 0}})
+            cache["tip_scanned"] = best
+            cache["history_cursor"] = max(0, best - SCAN_DEPTH)
+            cache["history_complete"] = False
+            hits = cache.get("hits", [])
+        usd = price_usd(cache)
+        total_bch = sum(float(item.get("reward") or 0) for item in hits)
+        observed = sum(item["hashrate_5m_th"] for item in workers)
+        effective_hashrate = observed or EXPECTED_HASHRATE_TH
+        difficulty = float(mining.get("difficulty") or chain.get("difficulty") or 0)
+        expected_seconds = difficulty * 4294967296 / (effective_hashrate * 1e12) if effective_hashrate else None
+        data.update({
+            "status": "ready" if ready else "syncing",
+            "detail": f"Height {best:,} | {int(network.get('connections') or 0)} peers",
+            "chain": chain,
+            "network": network,
+            "mining": mining,
+            "zmq": zmq,
+            "zmq_ready": (
+                any(item.get("type") == "pubhashblock" for item in zmq)
+                and pool.get("zmq_connected", False)
+            ),
+            "workers": workers,
+            "pool": pool,
+            "observed_hashrate_th": observed,
+            "expected_seconds": expected_seconds,
+            "blocks": hits[-20:],
+            "blocks_total": len(hits),
+            "total_bch": total_bch,
+            "bch_usd": usd or None,
+            "total_usd": total_bch * usd if usd else None,
+            "history_cursor": cache.get("history_cursor"),
+        })
+        save_cache(cache)
+    except Exception as error:
+        data["detail"] = str(error)
+    return data
+
+
+def collector():
+    while True:
+        started = time.monotonic()
+        try:
+            value = collect()
+        except Exception as error:
+            value = {
+                "time": int(time.time()),
+                "title": TITLE,
+                "status": "error",
+                "detail": str(error),
+                "stratum_port": STRATUM_PORT,
+                "workers": [],
+                "pool": {},
+                "blocks": [],
+            }
+        with STATE_LOCK:
+            STATE.clear()
+            STATE.update(value)
+        time.sleep(max(1, CACHE_SECONDS - (time.monotonic() - started)))
+
+
+def authorized(headers):
+    if not DASHBOARD_PASSWORD:
+        return False
+    header = headers.get("Authorization", "")
+    if not header.startswith("Basic "):
+        return False
+    try:
+        raw = base64.b64decode(header.split(" ", 1)[1]).decode()
+    except Exception:
+        return False
+    return hmac.compare_digest(raw, f"{DASHBOARD_USER}:{DASHBOARD_PASSWORD}")
 
 
 HTML = r"""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BCH Solo Pool</title>
 <style>
-:root{color-scheme:dark;--bg:#0e1111;--ink:#f3f7f5;--muted:#91a29a;--soft:#c5d5cf;--panel:#171d1b;--panel2:#111715;--line:#2a3833;--green:#48d597;--amber:#f5c84b;--red:#ff6b6b;--cyan:#72d7ff}
-*{box-sizing:border-box}html{scrollbar-color:#35463f #101514}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Inter,ui-sans-serif,system-ui,Segoe UI,Arial,sans-serif}
-body:before{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(72,213,151,.08),transparent 260px)}
-header{position:sticky;top:0;z-index:5;backdrop-filter:blur(12px);background:rgba(14,17,17,.82);border-bottom:1px solid var(--line)}
-.bar{max-width:1400px;margin:auto;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;gap:18px}.brand{display:flex;align-items:center;gap:12px}
-.mark{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#48d597,#72d7ff);box-shadow:0 0 24px rgba(72,213,151,.22)}
-h1{font-size:20px;line-height:1.1;margin:0}.sub,.muted{color:var(--muted)}.topstats{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-.pill{border:1px solid var(--line);border-radius:999px;padding:6px 10px;background:rgba(23,29,27,.78);color:var(--soft);white-space:nowrap}
-main{max-width:1400px;margin:auto;padding:18px 22px 30px;display:grid;gap:14px}.grid{display:grid;gap:14px}.hero{grid-template-columns:1.4fr 1fr 1fr 1fr}.cols{grid-template-columns:1.1fr 1fr}.metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
-.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:8px;padding:14px;min-width:0;box-shadow:0 12px 30px rgba(0,0,0,.16)}
-.label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.value{font-size:28px;font-weight:750;margin-top:4px;overflow-wrap:anywhere}.big{font-size:38px}.small{font-size:13px}.ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}.cyan{color:var(--cyan)}
-.meter{height:8px;background:#0b0f0e;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:12px}.fill{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--cyan))}
-table{width:100%;border-collapse:collapse}td{border-top:1px solid var(--line);padding:8px 4px;vertical-align:top}td:first-child{color:var(--muted);width:45%}
-pre{white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto;margin:10px 0 0;color:#d8e6eb;font-size:12px}.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.settings label{display:grid;gap:6px;color:var(--muted);font-size:12px}.settings input{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:#0a1017;color:var(--ink);font:inherit}.settings button{min-height:42px;border:0;border-radius:8px;background:linear-gradient(90deg,var(--blue),var(--green));color:#041118;font:inherit;font-weight:800;cursor:pointer}.settings-status{margin-top:8px;color:var(--muted)}.checklist{list-style:none;margin:0;padding:0;display:grid;gap:10px}.checklist li{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:#10161d}.checklist li span{display:block;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}.checklist li strong{display:block;font-size:16px;margin-top:4px}.checklist li.ok{border-color:#245b49}.checklist li.bad{border-color:#6d343f}
-@media(max-width:1050px){.hero,.metrics,.cols{grid-template-columns:repeat(2,minmax(0,1fr))}.big{font-size:32px}}@media(max-width:650px){.bar{display:block}.topstats{justify-content:flex-start;margin-top:12px}.hero,.metrics,.cols{grid-template-columns:1fr}.value{font-size:24px}.big{font-size:30px}main{padding:14px}}
-</style>
-</head>
-<body>
-<header><div class="bar"><div class="brand"><div class="mark"></div><div><h1 id="title">BCH Solo Pool</h1><div class="sub">Full node + solo stratum monitor</div></div></div><div class="topstats"><span class="pill" id="updated">Loading</span><span class="pill" id="port">Stratum -</span><span class="pill" id="hashrate">- TH/s</span></div></div></header>
+:root{color-scheme:dark;--bg:#0c1014;--panel:#151b21;--line:#29343e;--text:#edf4f7;--muted:#91a3ad;--green:#45d483;--blue:#55b9ff;--amber:#f0c54d;--red:#ff7272}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,Segoe UI,Arial,sans-serif}header{border-bottom:1px solid var(--line);background:#10151a}.bar,main{max-width:1280px;margin:auto}.bar{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px}h1{font-size:20px;margin:0}.status{color:var(--muted)}main{padding:16px 18px 28px;display:grid;gap:12px}.grid{display:grid;gap:12px;grid-template-columns:repeat(4,minmax(0,1fr))}.card{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:13px;min-width:0}.label{color:var(--muted);font-size:11px;text-transform:uppercase}.value{font-size:25px;font-weight:750;margin-top:3px}.green{color:var(--green)}.blue{color:var(--blue)}.amber{color:var(--amber)}.red{color:var(--red)}table{width:100%;border-collapse:collapse}th,td{padding:8px 6px;border-top:1px solid var(--line);text-align:left}th{color:var(--muted);font-size:11px;text-transform:uppercase}.mono{font-family:ui-monospace,Consolas,monospace}pre{margin:0;white-space:pre-wrap;max-height:180px;overflow:auto;color:#cbd8de;font-size:11px}.small{font-size:12px;color:var(--muted)}@media(max-width:850px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:540px){.grid{grid-template-columns:1fr}.bar{display:block}.status{margin-top:5px}}
+</style></head><body>
+<header><div class="bar"><h1 id="title">BCH Solo Pool</h1><div class="status" id="status">Starting</div></div></header>
 <main>
-<section class="grid hero">
-<div class="card"><div class="label">Node Sync</div><div class="value big" id="sync">-</div><div class="meter"><div class="fill" id="syncbar"></div></div><div class="muted small" id="syncmeta">Waiting for BCHN RPC</div></div>
-<div class="card"><div class="label">Best Height</div><div class="value" id="height">-</div><div class="muted small" id="headers">Headers -</div></div>
-<div class="card"><div class="label">Network Difficulty</div><div class="value" id="difficulty">-</div><div class="muted small" id="networkhash">Network hash -</div></div>
-<div class="card"><div class="label">Expected Solo Time</div><div class="value" id="expected">-</div><div class="muted small">Probability based, not a guarantee</div></div>
+<section class="grid">
+<div class="card"><div class="label">Hashrate</div><div class="value blue" id="hashrate">-</div></div>
+<div class="card"><div class="label">Workers</div><div class="value" id="workers">-</div></div>
+<div class="card"><div class="label">Best Share</div><div class="value" id="best">-</div></div>
+<div class="card"><div class="label">Total USD Earned</div><div class="value green" id="earned">-</div></div>
 </section>
-<section class="grid metrics">
-<div class="card"><div class="label">24h Chance</div><div class="value cyan" id="p24">-</div></div>
-<div class="card"><div class="label">7d Chance</div><div class="value cyan" id="p7">-</div></div>
-<div class="card"><div class="label">30d Chance</div><div class="value cyan" id="p30">-</div></div>
-<div class="card"><div class="label">Peers</div><div class="value" id="peers">-</div><div class="muted small" id="peermeta">Network connections</div></div>
+<section class="grid">
+<div class="card"><div class="label">Node Height</div><div class="value" id="height">-</div></div>
+<div class="card"><div class="label">Peers</div><div class="value" id="peers">-</div></div>
+<div class="card"><div class="label">ZMQ</div><div class="value" id="zmq">-</div></div>
+<div class="card"><div class="label">Expected Solo Time</div><div class="value amber" id="expected">-</div></div>
 </section>
-<section class="grid cols">
-<div class="card"><div class="section-title"><div class="label">Readiness Checklist</div><div class="muted small">node, pool, wallet, stratum</div></div><ul id="checklist" class="checklist"></ul></div>
-<div class="card"><div class="section-title"><div class="label">Settings</div><div class="muted small" id="settings-status">Saved in `.env`</div></div><form id="settings-form" class="settings"><label>BCH payout address<input name="BCH_MINING_ADDRESS" placeholder="bitcoincash:..." autocomplete="off"></label><label>Stratum port<input name="STRATUM_PORT" inputmode="numeric"></label><label>Dashboard port<input name="DASHBOARD_PORT" inputmode="numeric"></label><label>BCH P2P port<input name="BCH_P2P_PORT" inputmode="numeric"></label><label>Expected hashrate TH/s<input name="EXPECTED_HASHRATE_TH" inputmode="decimal"></label><label>Node cache MB<input name="BCHN_DBCACHE_MB" inputmode="numeric"></label><label>Parallel threads<input name="BCHN_PAR" inputmode="numeric"></label><label>RPC threads<input name="BCHN_RPC_THREADS" inputmode="numeric"></label><label>RPC workqueue<input name="BCHN_RPC_WORKQUEUE" inputmode="numeric"></label><label>Max connections<input name="BCHN_MAX_CONNECTIONS" inputmode="numeric"></label><label>Max mempool MB<input name="BCHN_MAX_MEMPOOL_MB" inputmode="numeric"></label><label>Pool signature<input name="POOL_SIGNATURE" autocomplete="off"></label><label>Dashboard title<input name="DASHBOARD_TITLE" autocomplete="off"></label><label>RPC user<input name="RPC_USER" autocomplete="off"></label><label>RPC password<input name="RPC_PASSWORD" autocomplete="off"></label><button type="submit">Save Settings</button></form><p class="settings-status">Changes take effect after restarting the Umbrel app.</p></div>
-</section>
-<section class="grid cols">
-<div class="card"><div class="section-title"><div class="label">Pool Signals</div><div class="muted small">from ckpool logs</div></div><table id="pool"></table></div>
-<div class="card"><div class="section-title"><div class="label">Node Health</div><div class="muted small" id="chain">Chain -</div></div><table id="node"></table></div>
-</section>
-<section class="grid cols">
-<div class="card"><div class="section-title"><div class="label">Mempool</div><div class="muted small">BCHN</div></div><table id="mempool"></table></div>
-<div class="card"><div class="section-title"><div class="label">Recent ckpool Logs</div><div class="muted small" id="logstate">latest file</div></div><pre id="logs"></pre></div>
-</section>
+<section class="card"><div class="label">Miner Username Stats</div><table><thead><tr><th>User</th><th>1m</th><th>5m</th><th>1h</th><th>Shares</th><th>Last Share</th><th>Best</th></tr></thead><tbody id="minerrows"></tbody></table></section>
+<section class="card"><div class="label">Confirmed Block Hits</div><table><thead><tr><th>Time</th><th>Height</th><th>Reward</th><th>Confirmations</th></tr></thead><tbody id="blockrows"></tbody></table></section>
+<section class="card"><div class="label">Pool Activity</div><div class="small" id="poolmeta"></div><pre id="logs"></pre></section>
 </main>
 <script>
 const $=id=>document.getElementById(id);
-function n(v,d=0){return v===null||v===undefined||Number.isNaN(Number(v))?'-':Number(v).toLocaleString(undefined,{maximumFractionDigits:d})}
-function pct(v){return v===null||v===undefined?'-':(v*100).toLocaleString(undefined,{maximumFractionDigits:4})+'%'}
-function bytes(v){if(!v)return '-'; const u=['B','KB','MB','GB']; let i=0; while(v>=1024&&i<u.length-1){v/=1024;i++} return v.toFixed(i?1:0)+' '+u[i]}
-function dur(sec){if(!sec)return '-'; if(sec>31557600)return (sec/31557600).toFixed(1)+' years'; if(sec>86400)return (sec/86400).toFixed(1)+' days'; if(sec>3600)return (sec/3600).toFixed(1)+' hours'; return Math.round(sec)+' sec'}
-function rows(items){return items.map(x=>'<tr><td>'+x[0]+'</td><td>'+String(x[1]??'-')+'</td></tr>').join('')}
-const settingsForm = document.querySelector("#settings-form");
-const settingsStatus = document.querySelector("#settings-status");
-const checklistEl = document.querySelector("#checklist");
-
-function readyItem(label, ok, detail) {
-  return '<li class="'+(ok?'ok':'bad')+'"><span>'+label+'</span><strong>'+(ok?'Ready':'Not ready')+'</strong><div class="muted small">'+detail+'</div></li>';
-}
-
-async function getConfig() {
-  const res = await fetch('/api/config', {cache:'no-store'});
-  if (!res.ok) throw new Error('config unavailable');
-  return res.json();
-}
-
-function populateSettings(config) {
-  if (!settingsForm) return;
-  for (const [key, value] of Object.entries(config)) {
-    const input = settingsForm.elements.namedItem(key);
-    if (input) input.value = value;
-  }
-}
-
-function renderChecklist(d, config) {
-  if (!checklistEl) return;
-  const bc = d.blockchain || {};
-  const pool = d.pool || {};
-  const synced = (bc.verificationprogress || 0) > 0.999 || !bc.initialblockdownload;
-  const walletReady = !!(config.BCH_MINING_ADDRESS && config.BCH_MINING_ADDRESS.length > 6);
-  const stratumReady = !!(d.stratum_port || config.STRATUM_PORT);
-  checklistEl.innerHTML = [
-    readyItem('Node sync', synced, synced ? 'BCHN is ready for templates.' : 'Wait for BCHN to finish syncing.'),
-    readyItem('Wallet set', walletReady, walletReady ? 'Use the payout address as your miner username.' : 'Set BCH_MINING_ADDRESS before mining.'),
-    readyItem('Pool running', true, pool.last_line ? 'ckpool is logging live shares.' : 'ckpool is running and waiting for miners.'),
-    readyItem('Stratum port', stratumReady, 'Configured port: ' + (d.stratum_port || config.STRATUM_PORT || '-')),
-  ].join('');
-}
-
-async function saveConfig(payload) {
-  const res = await fetch('/api/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error(`save failed (${res.status})`);
-  return res.json();
-}
-
-if (settingsForm) {
-  settingsForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const payload = {};
-    for (const element of settingsForm.elements) {
-      if (element.name) payload[element.name] = element.value.trim();
-    }
-    try {
-      await saveConfig(payload);
-      settingsStatus.textContent = "Saved. Restart the Umbrel app to apply node and pool changes.";
-    }
-    catch (err) {
-      settingsStatus.textContent = "Could not save settings.";
-    }
-  });
-}
-
-async function load(){
-  try{
-    const [statusRes, config] = await Promise.all([fetch('/api/status',{cache:'no-store'}), getConfig()]);
-    const d=await statusRes.json();
-    const bc=d.blockchain||{}, net=d.network||{}, mining=d.mining||{}, mem=d.mempool||{}, solo=d.solo||{}, pool=d.pool||{};
-    document.title=d.title; $('title').textContent=d.title; $('updated').textContent='Updated '+new Date(d.time*1000).toLocaleTimeString(); $('port').textContent='Stratum '+d.stratum_port; $('hashrate').textContent=n(d.expected_hashrate_th,2)+' TH/s';
-    const progress=(bc.verificationprogress||0)*100, synced=progress>99.9&&!bc.initialblockdownload;
-    $('sync').textContent=bc.error?'RPC error':progress.toFixed(4)+'%'; $('sync').className='value big '+(synced?'ok':'warn'); $('syncbar').style.width=Math.min(100,progress)+'%';
-    $('syncmeta').textContent=bc.error||((bc.initialblockdownload?'Initial block download':'Ready for templates')+' | pruned '+(bc.pruned?'yes':'no'));
-    $('height').textContent=n(bc.blocks); $('headers').textContent='Headers '+n(bc.headers)+' | confirmations lag '+n(Math.max(0,(bc.headers||0)-(bc.blocks||0)));
-    $('difficulty').textContent=n(mining.difficulty||bc.difficulty,2); $('networkhash').textContent='Network hash '+n((mining.networkhashps||0)/1e18,3)+' EH/s';
-    $('expected').textContent=dur(solo.expected_seconds); $('p24').textContent=pct(solo.probability_24h); $('p7').textContent=pct(solo.probability_7d); $('p30').textContent=pct(solo.probability_30d);
-    $('peers').textContent=n(net.connections); $('peermeta').textContent='In '+n(net.connections_in)+' | out '+n(net.connections_out);
-    $('chain').textContent='Chain '+(bc.chain||'-');
-    $('pool').innerHTML=rows([
-      ['Configured stratum', '0.0.0.0:'+d.stratum_port],
-      ['Expected hashrate', n(d.expected_hashrate_th,2)+' TH/s'],
-      ['Active workers hint', pool.active_workers_hint ?? 'watch miner UI'],
-      ['Accepted log hits', n(pool.accepted_hint)],
-      ['Rejected log hits', n(pool.rejected_hint)],
-      ['Share log hits', n(pool.share_hint)],
-      ['Block log hits', n(pool.block_hint)],
-      ['Last pool line', pool.last_line || 'No ckpool log line visible yet']
-    ]);
-    $('node').innerHTML=rows([
-      ['BCHN version', net.subversion||'-'],
-      ['Protocol', net.protocolversion||'-'],
-      ['Uptime', dur(d.uptime)],
-      ['Warnings', (bc.warnings||net.warnings||'none')],
-      ['Chain work', bc.chainwork||'-'],
-      ['Best block hash', bc.bestblockhash||'-'],
-      ['Relay fee', net.relayfee?net.relayfee+' BCH/kB':'-'],
-      ['Services', net.localservicesnames?net.localservicesnames.join(', '):'-'],
-      ['Payout address', '<span class="mono">'+(d.mining_address||config.BCH_MINING_ADDRESS||'-')+'</span>']
-    ]);
-    $('mempool').innerHTML=rows([
-      ['Transactions', n(mem.size)],
-      ['Bytes', bytes(mem.bytes)],
-      ['Memory usage', bytes(mem.usage)],
-      ['Max mempool', bytes(mem.maxmempool)],
-      ['Min relay tx fee', mem.mempoolminfee?mem.mempoolminfee+' BCH/kB':'-'],
-      ['Unbroadcast', n(mem.unbroadcastcount)]
-    ]);
-    $('logs').textContent=(d.logs||[]).join('\n') || 'No ckpool log file visible yet.'; $('logstate').textContent=(d.logs||[]).length+' lines';
-    populateSettings(config);
-    renderChecklist(d, config);
-  }catch(e){$('sync').textContent='Dashboard error'; $('sync').className='value big bad'; $('syncmeta').textContent=e.message}
-}
-load(); setInterval(load, 10000);
-</script>
-</body>
-</html>"""
+function fmt(v,d=2){return v===null||v===undefined?'-':Number(v).toLocaleString(undefined,{maximumFractionDigits:d})}
+function compact(v){if(!v)return '0';const u=['','K','M','G','T','P'];let x=Number(v),i=0;while(Math.abs(x)>=1000&&i<u.length-1){x/=1000;i++}return fmt(x,x>=100?0:x>=10?1:2)+u[i]}
+function age(ts){if(!ts)return '-';let s=Math.max(0,Date.now()/1000-ts);if(s<60)return Math.round(s)+'s';if(s<3600)return Math.round(s/60)+'m';return (s/3600).toFixed(1)+'h'}
+function duration(s){if(!s)return '-';if(s>31557600)return (s/31557600).toFixed(2)+'y';if(s>86400)return (s/86400).toFixed(1)+'d';return (s/3600).toFixed(1)+'h'}
+async function load(){try{const d=await(await fetch('/api/status',{cache:'no-store'})).json();document.title=d.title;$('title').textContent=d.title;$('status').textContent=d.status.toUpperCase()+' | '+d.detail+' | updated '+new Date(d.time*1000).toLocaleTimeString();$('hashrate').textContent=fmt(d.observed_hashrate_th,2)+' TH/s';$('workers').textContent=fmt((d.workers||[]).length,0);$('best').textContent=compact(Math.max(d.pool?.bestshare||0,...(d.workers||[]).map(x=>x.bestshare||0)));$('earned').textContent=d.total_usd==null?'$-':'$'+fmt(d.total_usd,2);$('height').textContent=fmt(d.chain?.blocks,0);$('peers').textContent=fmt(d.network?.connections,0);$('zmq').textContent=d.zmq_ready?'ACTIVE':'WAITING';$('zmq').className='value '+(d.zmq_ready?'green':'amber');$('expected').textContent=duration(d.expected_seconds);$('minerrows').innerHTML=(d.workers||[]).map(x=>'<tr><td class="mono">'+x.name+'</td><td>'+fmt(x.hashrate_1m_th,2)+'T</td><td>'+fmt(x.hashrate_5m_th,2)+'T</td><td>'+fmt(x.hashrate_1h_th,2)+'T</td><td>'+compact(x.shares)+'</td><td>'+age(x.last_share)+'</td><td>'+compact(x.bestshare)+'</td></tr>').join('')||'<tr><td colspan="7" class="small">Waiting for miner authorization and first shares.</td></tr>';$('blockrows').innerHTML=(d.blocks||[]).slice().reverse().map(x=>'<tr><td>'+new Date(x.time*1000).toLocaleString()+'</td><td>'+fmt(x.height,0)+'</td><td>'+fmt(x.reward,8)+' BCH</td><td>'+fmt(x.confirmations,0)+'</td></tr>').join('')||'<tr><td colspan="4" class="small">No payout blocks detected yet.</td></tr>';$('poolmeta').textContent='Accepted '+compact(d.pool?.accepted)+' | Rejected '+compact(d.pool?.rejected)+' | '+fmt(d.pool?.sps,2)+' shares/s | Stratum '+d.stratum_port;$('logs').textContent=(d.pool?.logs||[]).join('\n')}catch(e){$('status').textContent='Dashboard error: '+e.message}finally{setTimeout(load,30000)}}
+load();
+</script></body></html>"""
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -389,55 +411,29 @@ class Handler(BaseHTTPRequestHandler):
         return
 
     def do_GET(self):
-        if self.path.startswith("/api/config"):
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Cache-Control", "no-store")
+        if not authorized(self.headers):
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="BCH Dashboard"')
             self.end_headers()
-            self.wfile.write(json.dumps(read_config()).encode())
             return
         if self.path.startswith("/api/status"):
+            with STATE_LOCK:
+                body = json.dumps(STATE, separators=(",", ":")).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(json.dumps(collect()).encode())
+            self.wfile.write(body)
             return
+        body = HTML.encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(HTML.encode())
+        self.wfile.write(body)
 
-    def do_POST(self):
-        if not self.path.startswith("/api/config"):
-            self.send_response(404)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "not found"}).encode())
-            return
-        length = int(self.headers.get("Content-Length", "0"))
-        try:
-            payload = json.loads(self.rfile.read(length).decode("utf-8"))
-        except json.JSONDecodeError:
-            self.send_response(400)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "invalid json"}).encode())
-            return
-        try:
-            config = write_config(payload if isinstance(payload, dict) else {})
-        except OSError as exc:
-            self.send_response(500)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": str(exc)}).encode())
-            return
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(json.dumps({"config": config, "restartRequired": True}).encode())
 
 if __name__ == "__main__":
+    threading.Thread(target=collector, daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
