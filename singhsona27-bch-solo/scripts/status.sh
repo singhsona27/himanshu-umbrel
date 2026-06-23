@@ -6,13 +6,13 @@ docker compose ps
 echo
 USER="$(grep '^RPC_USER=' .env | cut -d= -f2-)"
 PASS="$(grep '^RPC_PASSWORD=' .env | cut -d= -f2-)"
-docker compose exec -T bchn bitcoin-cli -datadir=/data \
+docker compose exec -T bch-node bitcoin-cli -datadir=/data \
   -rpcconnect=127.0.0.1 \
   -rpcuser="$USER" \
   -rpcpassword="$PASS" \
   getblockchaininfo
 echo
-docker compose exec -T bchn bitcoin-cli -datadir=/data \
+docker compose exec -T bch-node bitcoin-cli -datadir=/data \
   -rpcconnect=127.0.0.1 \
   -rpcuser="$USER" \
   -rpcpassword="$PASS" \

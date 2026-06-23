@@ -2,7 +2,7 @@ manifestVersion: 1
 id: singhsona27-bch-solo
 category: bitcoin
 name: BCH Solo Node + Mining Pool
-version: "0.2.0"
+version: "0.2.1"
 tagline: High-performance Bitcoin Cash solo mining
 icon: https://raw.githubusercontent.com/singhsona27/himanshu-umbrel/main/singhsona27-bch-solo/icon.svg
 description: >-
@@ -10,9 +10,9 @@ description: >-
   notifications, per-miner bounded vardiff, a 30-second cached dashboard,
   and configurable public P2P connectivity.
 releaseNotes: >-
-  Upgrade to BCHN 29.0.0, add checksum-verified binaries, bounded Avalon Q and
-  Nano 3S vardiff, 30-second dashboard refreshes, per-worker miner stats, and
-  optimized node resource settings for coexistence with ETC.
+  Harden ckpool startup, align helper scripts with current service names, fix
+  dashboard ZMQ detection, document address.worker miner usernames, and keep
+  30-second dashboard refreshes with per-worker miner stats.
 developer: singhsona27
 website: https://bitcoincashnode.org
 dependencies: []

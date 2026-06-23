@@ -248,7 +248,11 @@ def pool_stats():
         "rejected": 0,
         "sps": 0,
         "bestshare": 0,
-        "zmq_connected": "ZMQ connected to" in text,
+        "zmq_connected": any(marker in text for marker in (
+            "ZMQ connected to",
+            "ZMQ block hash",
+            "Block hash changed",
+        )),
     }
     matches = re.findall(r"Pool:(\{[^\r\n]+\})", text)
     for raw in reversed(matches):

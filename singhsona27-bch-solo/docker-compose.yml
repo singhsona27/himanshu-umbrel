@@ -117,11 +117,17 @@ services:
     command:
       - |
         mkdir -p /run/ckpool /logs
-        test -n "$${BCH_MINING_ADDRESS}"
-        curl -fsS --user "$${RPC_USER}:$${RPC_PASSWORD}" \
+        while [ -z "$${BCH_MINING_ADDRESS}" ]; do
+          echo "Set BCH_MINING_ADDRESS in .env to start ckpool."
+          sleep 300
+        done
+        until curl -fsS --user "$${RPC_USER}:$${RPC_PASSWORD}" \
           --data-binary "{\"jsonrpc\":\"1.0\",\"id\":\"pool\",\"method\":\"validateaddress\",\"params\":[\"$${BCH_MINING_ADDRESS}\"]}" \
           -H "content-type: text/plain;" http://bch-node:8332/ \
-          | grep -Eq '"isvalid"[[:space:]]*:[[:space:]]*true'
+          | grep -Eq '"isvalid"[[:space:]]*:[[:space:]]*true'; do
+          echo "BCH_MINING_ADDRESS is not valid according to BCHN. Update .env and recreate this container."
+          sleep 300
+        done
         until curl -fsS --user "$${RPC_USER}:$${RPC_PASSWORD}" \
           --data-binary '{"jsonrpc":"1.0","id":"pool","method":"getblockchaininfo","params":[]}' \
           -H "content-type: text/plain;" http://bch-node:8332/ \

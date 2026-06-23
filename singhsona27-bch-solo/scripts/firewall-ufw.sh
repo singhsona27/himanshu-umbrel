@@ -5,8 +5,7 @@ cd "$(dirname "$0")/.."
 [ -f .env ] || { echo "Run scripts/init-env.sh first."; exit 1; }
 . ./.env
 
-sudo ufw allow "${STRATUM_PORT}/tcp" comment "BCH solo stratum ${DEPLOY_ID}"
-sudo ufw allow "${BCH_P2P_PORT}/tcp" comment "Bitcoin Cash P2P ${DEPLOY_ID}"
-echo "Dashboard ${DASHBOARD_PORT}/tcp is not opened automatically."
-echo "Prefer VPN/private access, or deliberately run:"
-echo "sudo ufw allow ${DASHBOARD_PORT}/tcp comment 'BCH dashboard ${DEPLOY_ID}'"
+LABEL="${DEPLOY_ID:-singhsona27-bch-solo}"
+sudo ufw allow "${STRATUM_PORT}/tcp" comment "BCH solo stratum ${LABEL}"
+sudo ufw allow "${BCH_P2P_PORT}/tcp" comment "Bitcoin Cash P2P ${LABEL}"
+echo "Dashboard access is handled by Umbrel's app proxy. Keep it private or behind VPN."
